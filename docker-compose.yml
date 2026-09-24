@@ -1,0 +1,41 @@
+# Daily use:    docker compose up -d          → http://localhost:3000
+# Development:  docker compose up -d db && pnpm dev
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dashboard
+      POSTGRES_PASSWORD: dashboard
+      POSTGRES_DB: dashboard
+      TZ: ${TZ:-UTC}
+    # Sized for one user: small buffers and few connections keep idle memory low.
+    command: postgres -c shared_buffers=32MB -c max_connections=20 -c work_mem=4MB
+    ports:
+      - '127.0.0.1:5432:5432' # host access for pnpm dev / test / ingest
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U dashboard -d dashboard']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://dashboard:dashboard@db:5432/dashboard
+      ORIGIN: http://localhost:3000
+      TZ: ${TZ:-UTC}
+    ports:
+      - '127.0.0.1:3000:3000'
+    volumes:
+      - ./data/incoming:/app/data/incoming:ro
+
+volumes:
+  pgdata:
