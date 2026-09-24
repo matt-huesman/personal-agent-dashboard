@@ -1,0 +1,74 @@
+{
+  "schema_version": "1.0",
+  "run_id": "email-digest-2026-09-24T08:00",
+  "generated_at": "2026-09-24T08:00:12Z",
+  "source": "email-digest",
+  "window": {
+    "since": "2026-09-23T20:00:00Z",
+    "until": "2026-09-24T08:00:00Z"
+  },
+  "action_items": [
+    {
+      "id": "ai_7b3d9f2a",
+      "source_message_id": "msg_a1b2c3d4e5",
+      "source_run_id": "email-digest-2026-09-24T08:00",
+      "title": "Send signed housing renewal back to landlord",
+      "description": "Landlord wants the signed lease renewal returned before the end of the week to hold the current rate.",
+      "due_date": "2026-09-26",
+      "priority": "high",
+      "links": [
+        { "url": "https://mail.google.com/mail/u/0/#inbox/msg_a1b2c3d4e5", "label": "Original email" }
+      ],
+      "status": "pool",
+      "scheduled_date": null,
+      "created_at": "2026-09-24T08:00:12Z"
+    },
+    {
+      "id": "ai_c4e18a05",
+      "source_message_id": "msg_f6g7h8i9j0",
+      "source_run_id": "email-digest-2026-09-24T08:00",
+      "title": "Reply to advisor about meeting times",
+      "description": "Advisor proposed three slots for a check-in next week and needs a pick or an alternative.",
+      "due_date": null,
+      "priority": "normal",
+      "links": [],
+      "status": "pool",
+      "scheduled_date": null,
+      "created_at": "2026-09-24T08:00:12Z"
+    },
+    {
+      "id": "ai_2f9004bd",
+      "source_message_id": "msg_k1l2m3n4o5",
+      "source_run_id": "email-digest-2026-09-24T08:00",
+      "title": "Submit August travel expense report",
+      "description": "Finance flagged the August travel expenses as still open in the portal.",
+      "due_date": "2026-09-30",
+      "priority": "normal",
+      "links": [
+        { "url": "https://example.com/expenses/portal", "label": "Expense portal" }
+      ],
+      "status": "pool",
+      "scheduled_date": null,
+      "created_at": "2026-09-24T08:00:12Z"
+    }
+  ],
+  "suggested_replies": [
+    {
+      "source_message_id": "msg_f6g7h8i9j0",
+      "confidence": "high",
+      "draft": "Tuesday at 2pm works best for me. Happy to send a calendar invite unless you'd prefer to. Thanks!"
+    }
+  ],
+  "spam_candidates": [
+    {
+      "source_message_id": "msg_z9y8x7w6v5",
+      "reason": "Unsolicited bulk sender, unsubscribe-only footer, no prior thread history."
+    }
+  ],
+  "fyi": [
+    {
+      "source_message_id": "msg_p5q4r3s2t1",
+      "summary": "Facilities notice: power maintenance in the building this Saturday morning. No action needed."
+    }
+  ]
+}

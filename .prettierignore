@@ -1,0 +1,5 @@
+pnpm-lock.yaml
+drizzle/
+build/
+.svelte-kit/
+src/lib/components/ui/
