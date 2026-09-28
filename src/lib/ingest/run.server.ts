@@ -8,10 +8,17 @@
 import { z } from 'zod';
 import { db } from '$lib/server/db';
 import { insertIngested } from '$lib/features/action-items/service.server';
+import { driveSource } from './drive-source.server';
 import { envelope } from './envelope';
 import { localSource } from './local-source.server';
 import { ingestRuns } from './table.server';
 import type { EnvelopeSource } from './source';
+
+/** Drive when configured, otherwise the local data/incoming folder. */
+export function defaultSource(): EnvelopeSource {
+	const folderId = process.env.DRIVE_FOLDER_ID;
+	return folderId ? driveSource(folderId) : localSource();
+}
 
 export type IngestReport = {
 	ingested: { ref: string; run_id: string; items: number; inserted: number }[];
@@ -19,7 +26,7 @@ export type IngestReport = {
 	failed: { ref: string; error: string }[];
 };
 
-export async function ingest(source: EnvelopeSource = localSource()): Promise<IngestReport> {
+export async function ingest(source: EnvelopeSource = defaultSource()): Promise<IngestReport> {
 	const report: IngestReport = { ingested: [], skipped: [], failed: [] };
 	const seen = new Set(
 		(await db.select({ ref: ingestRuns.source_ref }).from(ingestRuns)).map((r) => r.ref)

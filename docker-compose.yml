@@ -28,6 +28,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Google credentials + DRIVE_FOLDER_ID; `environment` below overrides the rest.
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgres://dashboard:dashboard@db:5432/dashboard
       ORIGIN: http://localhost:3000
