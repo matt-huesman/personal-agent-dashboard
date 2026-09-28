@@ -11,9 +11,14 @@
 
 	async function checkForNew() {
 		checking = true;
-		const report: IngestReport = await (await fetch('/api/ingest', { method: 'POST' })).json();
+		const res = await fetch('/api/ingest', { method: 'POST' });
 		checking = false;
+		if (!res.ok) {
+			toast.error("Couldn't check for new items", { description: (await res.json()).message });
+			return;
+		}
 
+		const report: IngestReport = await res.json();
 		const added = report.ingested.reduce((sum, run) => sum + run.inserted, 0);
 		toast(added ? `${added} new item${added === 1 ? '' : 's'}` : 'Nothing new');
 		for (const failure of report.failed) {

@@ -16,9 +16,12 @@ cp .env.example .env        # set TZ to your timezone: it defines "today"
 docker compose up -d        # app on http://localhost:3000, restarts with Docker
 ```
 
-The app applies migrations at startup. Drop envelope JSON files into
-`data/incoming/` and click **Check for new**, or run
-`curl -X POST localhost:3000/api/ingest`.
+The app applies migrations at startup. Without Google configured, it ingests
+envelope JSON from `data/incoming/`. To connect Drive and the scheduled email
+agent, follow [docs/google-setup.md](docs/google-setup.md).
+
+New envelopes are picked up automatically when the board loads (at most once
+every 10 minutes), or right away with **Check for new**.
 
 ## Develop
 
@@ -28,8 +31,10 @@ docker compose up -d db     # just Postgres
 pnpm dev                    # http://localhost:5173
 pnpm check                  # svelte-check / types (includes table ↔ schema drift)
 pnpm test                   # vitest against the dashboard_test database
-pnpm ingest                 # ingest data/incoming/*.json from the CLI
+pnpm ingest                 # ingest from Drive (or data/incoming/) from the CLI
 pnpm db:generate --name x   # new migration after changing a table
+pnpm drive:auth             # one-time Google authorization (docs/google-setup.md)
+pnpm producer start|publish # the email agent's CLI (agents/email-digest.md)
 ```
 
 The dev server and the Docker app share the same database.
@@ -37,11 +42,20 @@ The dev server and the Docker app share the same database.
 ## How it works
 
 ```
-data/incoming/*.json ──▶ EnvelopeSource ──▶ Zod (once) ──▶ insert-or-ignore ──▶ Postgres
-   (Drive later)          (swap point)                     + ingest_runs ledger     │
-                                                                                    ▼
-                                            UI ◀── page load / JSON API ◀── service.server.ts
+ CLOUD (Claude Code routine, on a schedule)
+ Gmail ──▶ Claude classifies ──▶ draft.json ──▶ pnpm producer publish ──▶ Google Drive
+          (agents/email-digest.md)             (ids, window, Zod-checked)   "Agent Dashboard Inbox"
+                                                                                  │
+ LOCAL (Docker)                                                                   ▼
+ UI ◀── page load / JSON API ◀── service.server.ts ◀── insert-or-ignore ◀── Zod ◀── DriveSource
 ```
+
+- **The producer and the dashboard share one contract:** the producer builds
+  its envelope with the same Zod schema the dashboard ingests with
+  (`src/lib/ingest/envelope.ts`).
+- **Windows chain:** each run reads mail from the end of the previous
+  published run up to now, so no mail is missed or read twice, even if a run
+  fails.
 
 - **Board:** the pool, then today and the next six days, then a "Later" column
   for anything further out. Drag cards between and within columns, or use a

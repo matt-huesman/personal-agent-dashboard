@@ -8,6 +8,7 @@
 		"node": ">=22.12"
 	},
 	"scripts": {
+		"prepare": "svelte-kit sync || echo \"\"",
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
@@ -16,7 +17,9 @@
 		"format": "prettier --write .",
 		"db:up": "docker compose up -d db",
 		"db:generate": "drizzle-kit generate",
-		"ingest": "tsx --env-file-if-exists=.env scripts/ingest.ts"
+		"ingest": "tsx --env-file-if-exists=.env scripts/ingest.ts",
+		"producer": "tsx --env-file-if-exists=.env scripts/producer.ts",
+		"drive:auth": "tsx --env-file-if-exists=.env scripts/drive-auth.ts"
 	},
 	"dependencies": {
 		"drizzle-orm": "^0.45.3",
