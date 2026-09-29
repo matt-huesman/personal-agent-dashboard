@@ -1,12 +1,13 @@
 // Every action-item write goes through here. Commands check legality against
 // transitions.ts; the status/date invariant itself is a CHECK constraint.
 //
-// Ordering: `position` orders open items within a container (the pool, or one
-// day). Writers either renumber a container 0..n-1 or insert above its current
-// minimum, so positions may be negative or gapped — only their order matters.
+// Ordering: within a container (the pool, or one day) weekly (sticky) items
+// come first, then `position`. Writers either renumber a container 0..n-1 in
+// that order or insert above its current minimum, so positions may be negative
+// or gapped — only their order matters.
 
 import { error } from '@sveltejs/kit';
-import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, min, ne, or } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, min, ne, or } from 'drizzle-orm';
 import { db, type Tx } from '$lib/server/db';
 import { startOf, today as localToday } from '$lib/dates';
 import { actionItems } from './table.server';
@@ -21,6 +22,8 @@ import type {
 
 const live = isNull(actionItems.deleted_at);
 const open = ne(actionItems.status, 'done');
+/** Order within a container: weekly items pinned to the top, then the user's order. */
+const containerOrder = [desc(actionItems.sticky), asc(actionItems.position)];
 
 const now = () => new Date().toISOString();
 const newId = () => `ai_${crypto.randomUUID().replaceAll('-', '').slice(0, 12)}`;
@@ -50,7 +53,7 @@ export async function listBoard(today = localToday()): Promise<ActionItemRecord[
 				)
 			)
 		)
-		.orderBy(asc(actionItems.position));
+		.orderBy(...containerOrder);
 }
 
 // --- Commands ----------------------------------------------------------------
@@ -222,7 +225,7 @@ async function openIn(tx: Tx, scheduled_date: string | null): Promise<string[]> 
 		.select({ id: actionItems.id })
 		.from(actionItems)
 		.where(and(live, open, container(scheduled_date)))
-		.orderBy(asc(actionItems.position));
+		.orderBy(...containerOrder);
 	return rows.map((r) => r.id);
 }
 

@@ -62,7 +62,10 @@ The dev server and the Docker app share the same database.
   panels, or use a card's ⋯ menu. Click a title to edit; the circle marks it done.
 - **Weekly tasks:** mark a task on a day "Repeat weekly" (⋯ menu or edit
   dialog). Checked off or not, it comes back on that weekday next week, and it
-  never rolls into the following day.
+  never rolls into the following day. Weekly tasks stay pinned at the top of
+  their day.
+- **Completed tasks** are hidden unless **Show completed** is on (remembered
+  per browser); checking one off offers Undo.
 - **Estimates:** the clock chip on every card sets an estimate in one click
   (15m–4h or custom); day headers total them and flag unestimated items.
 - **Projects:** colour-coded themes (stripe + dot on each task). The sidebar

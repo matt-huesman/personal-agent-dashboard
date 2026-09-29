@@ -42,12 +42,14 @@
 		items,
 		today,
 		projects,
-		projectFilter
+		projectFilter,
+		showDone
 	}: {
 		items: ActionItemRecord[];
 		today: string;
 		projects: ProjectSummary[];
 		projectFilter: string | null; // show only this project's items
+		showDone: boolean; // show completed items under each panel
 	} = $props();
 
 	const days = $derived(Array.from({ length: BOARD_DAYS }, (_, i) => addDays(today, i)));
@@ -72,13 +74,16 @@
 		projectFilter ? items.filter((i) => i.project_id === projectFilter) : items
 	);
 
-	// Items arrive ordered by position; done items sort by when they were finished.
+	// Items arrive in container order (weekly items first, then position);
+	// done items sort by when they were finished, and only show when asked.
 	const openIn = (list: ActionItemRecord[], date: string | null) =>
 		list.filter((i) => i.status !== 'done' && i.scheduled_date === date);
 	const doneIn = (date: string | null) =>
-		visible
-			.filter((i) => i.status === 'done' && i.scheduled_date === date)
-			.sort((a, b) => (a.completed_at ?? '').localeCompare(b.completed_at ?? ''));
+		showDone
+			? visible
+					.filter((i) => i.status === 'done' && i.scheduled_date === date)
+					.sort((a, b) => (a.completed_at ?? '').localeCompare(b.completed_at ?? ''))
+			: [];
 	const later = $derived(
 		visible
 			.filter((i) => i.status !== 'done' && i.scheduled_date !== null && i.scheduled_date > lastDay)
@@ -112,7 +117,15 @@
 		move: (id, scheduled_date, after) =>
 			run(api.move(id, { scheduled_date, index: indexAfter(id, scheduled_date, after) })),
 		update: (item, patch) => run(api.update(item.id, patch)),
-		complete: (item) => run(api.complete(item.id)),
+		complete: async (item) => {
+			await run(api.complete(item.id));
+			// With completed items hidden the card vanishes, so offer a way back.
+			if (!showDone)
+				toast('Done', {
+					description: item.title,
+					action: { label: 'Undo', onClick: () => run(api.reopen(item.id)) }
+				});
+		},
 		reopen: (item) => run(api.reopen(item.id)),
 		edit: (item) => (editing = item),
 		remove: async (item) => {

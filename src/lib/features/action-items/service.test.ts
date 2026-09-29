@@ -127,6 +127,20 @@ describe('action-item service', () => {
 			expect(await titlesIn(TODAY)).toEqual(['ordinary']);
 		});
 
+		it('stay at the top of their day, above new, dragged, and later-marked items', async () => {
+			await service.create(input('first', TOMORROW));
+			await sticky('Gym', TOMORROW);
+			const later = await service.create(input('later', TOMORROW)); // new items go on top…
+			expect(await titlesIn(TOMORROW)).toEqual(['Gym', 'later', 'first']); // …but below Gym
+
+			await service.move(later.id, { scheduled_date: TOMORROW, index: 0 });
+			expect(await titlesIn(TOMORROW)).toEqual(['Gym', 'later', 'first']);
+
+			const first = (await service.listBoard(TODAY)).find((i) => i.title === 'first')!;
+			await service.update(first.id, { sticky: true });
+			expect(await titlesIn(TOMORROW)).toEqual(['Gym', 'first', 'later']);
+		});
+
 		it('stay done for the rest of the day they were checked off', async () => {
 			const gym = await sticky('Gym', TODAY);
 			await service.complete(gym.id);
