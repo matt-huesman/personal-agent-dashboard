@@ -3,15 +3,19 @@
 	import { Input } from '$lib/components/ui/input';
 	import { DURATION_PRESETS, formatMinutes, parseMinutes } from '$lib/durations';
 
-	let { value = $bindable(), id }: { value: number | null; id?: string } = $props();
+	let {
+		value = $bindable(),
+		id,
+		required = false
+	}: { value: number | null; id?: string; required?: boolean } = $props();
 
 	const isPreset = (v: number | null) =>
-		v === null || (DURATION_PRESETS as readonly number[]).includes(v);
+		(v === null && !required) || (DURATION_PRESETS as readonly number[]).includes(v ?? -1);
 
 	// A value that isn't a preset opens straight into the custom field.
 	const initial = () => value;
 	let custom = $state(!isPreset(initial()));
-	let text = $state(isPreset(initial()) ? '' : formatMinutes(initial()!));
+	let text = $state(isPreset(initial()) ? '' : formatMinutes(initial() ?? 0));
 
 	const selected = $derived(custom ? 'custom' : value === null ? 'none' : String(value));
 
@@ -19,6 +23,12 @@
 		custom = choice === 'custom';
 		if (choice === 'none') value = null;
 		else if (!custom) value = Number(choice);
+	}
+
+	function typed() {
+		// "0" is a real answer for a required duration (e.g. no lunch break).
+		const minutes = text.trim() === '0' && required ? 0 : parseMinutes(text);
+		if (minutes !== null || !required) value = minutes;
 	}
 </script>
 
@@ -28,7 +38,7 @@
 			{custom ? 'Custom' : value === null ? 'None' : formatMinutes(value)}
 		</Select.Trigger>
 		<Select.Content>
-			<Select.Item value="none">None</Select.Item>
+			{#if !required}<Select.Item value="none">None</Select.Item>{/if}
 			{#each DURATION_PRESETS as minutes (minutes)}
 				<Select.Item value={String(minutes)}>{formatMinutes(minutes)}</Select.Item>
 			{/each}
@@ -40,9 +50,9 @@
 			class="w-36"
 			placeholder="e.g. 1h 20m"
 			aria-label="Custom duration"
-			aria-invalid={text.trim() !== '' && value === null}
+			aria-invalid={text.trim() !== '' && parseMinutes(text) === null && text.trim() !== '0'}
 			bind:value={text}
-			oninput={() => (value = parseMinutes(text))}
+			oninput={typed}
 		/>
 	{/if}
 </div>

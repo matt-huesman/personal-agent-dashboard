@@ -59,7 +59,10 @@ src/
       components/                 Svelte components for this feature
       *.test.ts                   tests, next to what they test
                                   (current: action-items, projects, digests — a
-                                  read-only view over ingest_runs, no table)
+                                  read-only view over ingest_runs, no table —
+                                  planner — the pure scheduling algorithm +
+                                  its settings — and calendar — the week view,
+                                  CalendarSource, and planner glue)
   routes/
     +layout.server.ts             shell data (projects) + throttled auto-ingest
     +page.svelte                  the board;  digests/, projects/ are sibling pages
@@ -213,6 +216,26 @@ there's no per-week history.
   secondary actions hidden until hover or focus. No decorative chrome.
 - **Accessibility:** everything draggable is also reachable from a menu or
   dialog; controls have labels.
+
+## Planning and the calendar
+
+- **The algorithm is a pure function** (`features/planner/planner.ts`,
+  `planDay`): tasks + busy time + now + settings → blocks, overflow and stats.
+  It must stay free of I/O, dates and app types, so it's testable on its own
+  and runs identically on server and client. Its header comment documents
+  the principles; each principle has a test in `planner.test.ts`.
+- **Policy lives in data.** Every tunable (hours, focus length, breaks,
+  switch buffer, capacity, default estimate) is in `plannerSettings` (Zod,
+  with defaults) and edited through `plannerFields`. New settings are a schema
+  line plus a field line; stored rows pick up defaults automatically.
+- **Glue is separate** (`features/calendar/plan.ts`): which tasks belong to a
+  day, the batching key (`contextOf`: project, else email follow-up, else
+  other), and events as busy time. Change grouping there, not in the algorithm.
+- **Calendar integrations** implement `CalendarSource` and are wired in
+  `calendar.server.ts`. The planner already treats every timed event as busy
+  and the week view already renders them.
+- The page loads data only; the plan is `$derived` in the browser and
+  recomputed every minute, so today always plans from now.
 
 ## Ingest
 

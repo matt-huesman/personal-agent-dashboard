@@ -67,6 +67,12 @@ The dev server and the Docker app share the same database.
   (15m–4h or custom); day headers total them and flag unestimated items.
 - **Projects:** colour-coded themes (stripe + dot on each task). The sidebar
   lists them with open counts; click one to filter the board. Manage at `/projects`.
+- **Calendar:** a week view that time-blocks each day's tasks automatically.
+  It batches tasks by project to minimise context switching, caps focus
+  sessions (default 90 min) with breaks, puts urgent and deep work first,
+  never plans in the past, and flags what won't fit instead of cramming it in.
+  Tune it under **Planning**. Calendar integrations plug in as busy time
+  (`features/calendar/source.ts`).
 - **Digests:** each email-agent run as a morning/afternoon/evening briefing:
   FYIs, suggested replies (copyable), new tasks and possible spam, each linked
   to its email.

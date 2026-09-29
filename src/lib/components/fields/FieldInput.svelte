@@ -2,6 +2,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import * as Select from '$lib/components/ui/select';
+	import { fromClock, toClock } from '$lib/dates';
 	import type { Link } from '$lib/schema-primitives';
 	import DurationInput from './DurationInput.svelte';
 	import LinksInput from './LinksInput.svelte';
@@ -69,7 +70,20 @@
 		</Select.Content>
 	</Select.Root>
 {:else if field.kind === 'duration'}
-	<DurationInput {id} bind:value={() => value as number | null, (v) => (value = v)} />
+	<DurationInput
+		{id}
+		required={field.required}
+		bind:value={() => value as number | null, (v) => (value = v)}
+	/>
+{:else if field.kind === 'time'}
+	<Input
+		{id}
+		type="time"
+		step="300"
+		class="w-36"
+		required
+		bind:value={() => toClock(value as number), (v) => (value = v ? fromClock(v) : value)}
+	/>
 {:else if field.kind === 'links'}
 	<LinksInput {id} bind:links={() => value as Link[], (v) => (value = v)} />
 {/if}
