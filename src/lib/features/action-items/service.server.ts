@@ -10,7 +10,7 @@ import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, min, ne, or } from '
 import { db, type Tx } from '$lib/server/db';
 import { startOf, today as localToday } from '$lib/dates';
 import { actionItems } from './table.server';
-import { can, completed, moved, reopened, type Command } from './transitions';
+import { can, completed, moved, nextOccurrence, reopened, type Command } from './transitions';
 import type {
 	ActionItem,
 	ActionItemRecord,
@@ -25,14 +25,17 @@ const open = ne(actionItems.status, 'done');
 const now = () => new Date().toISOString();
 const newId = () => `ai_${crypto.randomUUID().replaceAll('-', '').slice(0, 12)}`;
 
+const NEEDS_DAY = 'Only items on a day can repeat weekly';
+
 // --- Reads -------------------------------------------------------------------
 
 /**
  * What the board shows: every open item, plus done items whose day hasn't
- * passed (or, in the pool, that were completed today). Overdue items are
- * rolled forward first.
+ * passed (or, in the pool, that were completed today). Time is applied first:
+ * weekly items advance, then other overdue items roll into today.
  */
 export async function listBoard(today = localToday()): Promise<ActionItemRecord[]> {
+	await advanceSticky(today);
 	await rollOver(today);
 	return db
 		.select()
@@ -52,13 +55,39 @@ export async function listBoard(today = localToday()): Promise<ActionItemRecord[
 
 // --- Commands ----------------------------------------------------------------
 
-/** Unfinished items on a past day flow into today, ahead of today's own items. */
+/**
+ * Weekly (sticky) items whose day has passed, done or not, come back open on
+ * the same weekday of the coming week, at the top of that day.
+ */
+export async function advanceSticky(today = localToday()): Promise<number> {
+	return db.transaction(async (tx) => {
+		const passed = await tx
+			.select({ id: actionItems.id, scheduled_date: actionItems.scheduled_date })
+			.from(actionItems)
+			.where(and(live, eq(actionItems.sticky, true), lt(actionItems.scheduled_date, today)))
+			.orderBy(asc(actionItems.position));
+		for (const item of passed) {
+			const day = nextOccurrence(item.scheduled_date!, today); // sticky ⇒ dated (CHECK)
+			await write(tx, item.id, { ...moved(day), position: await topOf(tx, day) });
+		}
+		return passed.length;
+	});
+}
+
+/** Unfinished non-weekly items on a past day flow into today, ahead of today's own items. */
 export async function rollOver(today = localToday()): Promise<number> {
 	return db.transaction(async (tx) => {
 		const overdue = await tx
 			.select({ id: actionItems.id })
 			.from(actionItems)
-			.where(and(live, eq(actionItems.status, 'scheduled'), lt(actionItems.scheduled_date, today)))
+			.where(
+				and(
+					live,
+					eq(actionItems.status, 'scheduled'),
+					eq(actionItems.sticky, false),
+					lt(actionItems.scheduled_date, today)
+				)
+			)
 			.orderBy(asc(actionItems.scheduled_date), asc(actionItems.position));
 		if (overdue.length === 0) return 0;
 
@@ -74,6 +103,7 @@ export async function rollOver(today = localToday()): Promise<number> {
 }
 
 export async function create(input: CreateActionItemInput): Promise<ActionItemRecord> {
+	if (input.sticky && input.scheduled_date === null) error(400, NEEDS_DAY);
 	return db.transaction(async (tx) => {
 		const timestamp = now();
 		const [item] = await tx
@@ -109,6 +139,8 @@ export async function insertIngested(tx: Tx, items: ActionItem[]): Promise<numbe
 			items.map((item, i) => ({
 				...item,
 				...moved(null), // placement is the user's decision, never the producer's
+				project_id: null,
+				sticky: false,
 				position: top - items.length + 1 + i,
 				updated_at: timestamp,
 				deleted_at: null
@@ -121,7 +153,10 @@ export async function insertIngested(tx: Tx, items: ActionItem[]): Promise<numbe
 
 /** Content edits only; placement changes go through move/complete/reopen. */
 export async function update(id: string, input: UpdateActionItemInput): Promise<ActionItemRecord> {
-	return db.transaction((tx) => write(tx, id, input));
+	return db.transaction(async (tx) => {
+		if (input.sticky && (await find(tx, id)).scheduled_date === null) error(409, NEEDS_DAY);
+		return write(tx, id, input);
+	});
 }
 
 /** Schedule, unschedule, reschedule or reorder: place the item at `index` in a container. */
@@ -134,7 +169,9 @@ export async function move(
 		const order = (await openIn(tx, scheduled_date)).filter((other) => other !== id);
 		order.splice(index, 0, id); // an index past the end appends
 		await renumber(tx, order);
-		return write(tx, id, moved(scheduled_date));
+		const placement = moved(scheduled_date);
+		// The pool has no weekday, so a weekly item stops repeating there.
+		return write(tx, id, scheduled_date === null ? { ...placement, sticky: false } : placement);
 	});
 }
 

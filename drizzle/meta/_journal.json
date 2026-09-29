@@ -8,6 +8,20 @@
       "when": 1790268760281,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790691056196,
+      "tag": "0001_projects-and-estimates",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790692409264,
+      "tag": "0002_sticky-tasks",
+      "breakpoints": true
     }
   ]
 }

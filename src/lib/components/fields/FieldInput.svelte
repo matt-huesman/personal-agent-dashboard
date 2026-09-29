@@ -3,13 +3,26 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import * as Select from '$lib/components/ui/select';
 	import type { Link } from '$lib/schema-primitives';
+	import DurationInput from './DurationInput.svelte';
 	import LinksInput from './LinksInput.svelte';
-	import type { Field } from './fields';
+	import type { Field, Option } from './fields';
 
 	// `value` is typed by the entity's schema at the call site; here each kind
 	// knows its own shape. Nullable kinds map an empty input back to null.
-	let { field, id, value = $bindable() }: { field: Field; id: string; value: unknown } = $props();
+	let {
+		field,
+		id,
+		value = $bindable(),
+		options = []
+	}: { field: Field; id: string; value: unknown; options?: readonly Option[] } = $props();
+
+	const NONE = '__none';
+	const chosen = $derived(options.find((o) => o.value === value));
 </script>
+
+{#snippet dot(color: string | undefined)}
+	{#if color}<span class="size-2 shrink-0 rounded-full" style:background={color}></span>{/if}
+{/snippet}
 
 {#if field.kind === 'text'}
 	<Input {id} required bind:value={() => value as string, (v) => (value = v)} />
@@ -35,6 +48,28 @@
 			{/each}
 		</Select.Content>
 	</Select.Root>
+{:else if field.kind === 'select'}
+	<Select.Root
+		type="single"
+		value={(value as string | null) ?? NONE}
+		onValueChange={(v) => (value = v === NONE ? null : v)}
+	>
+		<Select.Trigger {id} class="w-44">
+			<span class="flex items-center gap-2 truncate">
+				{@render dot(chosen?.color)}{chosen?.label ?? 'None'}
+			</span>
+		</Select.Trigger>
+		<Select.Content>
+			<Select.Item value={NONE}>None</Select.Item>
+			{#each options as option (option.value)}
+				<Select.Item value={option.value}>
+					<span class="flex items-center gap-2">{@render dot(option.color)}{option.label}</span>
+				</Select.Item>
+			{/each}
+		</Select.Content>
+	</Select.Root>
+{:else if field.kind === 'duration'}
+	<DurationInput {id} bind:value={() => value as number | null, (v) => (value = v)} />
 {:else if field.kind === 'links'}
 	<LinksInput {id} bind:links={() => value as Link[], (v) => (value = v)} />
 {/if}

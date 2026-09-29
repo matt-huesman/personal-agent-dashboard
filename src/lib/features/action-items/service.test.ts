@@ -105,6 +105,50 @@ describe('action-item service', () => {
 		await service.restore(item.id);
 		expect(await titlesIn(null)).toEqual(['a']);
 	});
+
+	describe('weekly (sticky) items', () => {
+		// TODAY is Thursday 2026-09-24.
+		const sticky = (title: string, day: string) =>
+			service.create(createActionItemInput.parse({ title, scheduled_date: day, sticky: true }));
+
+		it('come back on the same weekday next week, whether checked off or not', async () => {
+			const gymMon = await sticky('Gym', '2026-09-21'); // Monday
+			await service.complete(gymMon.id);
+			await sticky('Gym', '2026-09-22'); // Tuesday, missed
+			await service.create(input('ordinary', '2026-09-22'));
+
+			const board = await service.listBoard(TODAY);
+			const find = (day: string) => board.find((i) => i.scheduled_date === day);
+
+			expect(find('2026-09-28')).toMatchObject({ title: 'Gym', status: 'scheduled', sticky: true });
+			expect(find('2026-09-28')!.completed_at).toBeNull();
+			expect(find('2026-09-29')).toMatchObject({ title: 'Gym', status: 'scheduled' });
+			// Only the ordinary item rolled into today; the missed Gym didn't.
+			expect(await titlesIn(TODAY)).toEqual(['ordinary']);
+		});
+
+		it('stay done for the rest of the day they were checked off', async () => {
+			const gym = await sticky('Gym', TODAY);
+			await service.complete(gym.id);
+
+			const [item] = await service.listBoard(TODAY);
+			expect(item).toMatchObject({ status: 'done', scheduled_date: TODAY });
+		});
+
+		it('need a day: rejected in the pool, and moving to the pool stops the repeat', async () => {
+			await expect(
+				service.create(createActionItemInput.parse({ title: 'x', sticky: true }))
+			).rejects.toMatchObject({ status: 400 });
+			const pooled = await service.create(input('pooled'));
+			await expect(service.update(pooled.id, { sticky: true })).rejects.toMatchObject({
+				status: 409
+			});
+
+			const gym = await sticky('Gym', TOMORROW);
+			const moved = await service.move(gym.id, { scheduled_date: null, index: 0 });
+			expect(moved).toMatchObject({ status: 'pool', sticky: false });
+		});
+	});
 });
 
 function input(title: string, scheduled_date: string | null = null) {

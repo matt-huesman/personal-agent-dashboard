@@ -27,6 +27,8 @@ src/
   lib/
     schema-primitives.ts          shared Zod primitives (isoDate, isoDateTime, link)
     dates.ts                      calendar-day helpers ("YYYY-MM-DD" strings)
+    durations.ts                  minutes ↔ "1h 30m" (presets, format, parse)
+    nav.ts                        sidebar navigation entries
     types.ts                      Equal<> (table ↔ schema drift check)
     server/
       db.ts                       drizzle client + migrate()
@@ -36,6 +38,7 @@ src/
     components/
       ui/                         shadcn-svelte (generated; edit sparingly)
       fields/                     FieldInput + field config types (shared forms)
+      shell/                      app chrome: Sidebar
     ingest/
       envelope.ts                 the ingest contract (composes entity schemas)
       source.ts                   EnvelopeSource interface
@@ -55,8 +58,11 @@ src/
       api.ts                      typed browser client for the API routes
       components/                 Svelte components for this feature
       *.test.ts                   tests, next to what they test
+                                  (current: action-items, projects, digests — a
+                                  read-only view over ingest_runs, no table)
   routes/
-    +page.server.ts / +page.svelte
+    +layout.server.ts             shell data (projects) + throttled auto-ingest
+    +page.svelte                  the board;  digests/, projects/ are sibling pages
     api/<feature>/...             JSON API
   test/                           test setup (global migrate, useTestDb)
 drizzle/                          generated SQL migrations (committed)
@@ -151,7 +157,12 @@ Action-item lifecycle, for reference:
 | reopen | done | back to its day, else the pool |
 | edit | any | content fields only |
 | delete / restore | any | soft delete / undo |
-| roll-over (automatic) | scheduled, day < today | moves to today, above today's items |
+| roll-over (automatic) | scheduled, not sticky, day < today | moves to today, above today's items |
+| weekly advance (automatic) | sticky, day < today, done or not | same weekday next occurrence, reopened, top of that day |
+
+`sticky` ("repeat weekly") requires a day (CHECK constraint); moving a sticky
+item to the pool turns it off. It's one row that advances, not a series, so
+there's no per-week history.
 
 ## Services
 
@@ -176,9 +187,25 @@ Action-item lifecycle, for reference:
   through `features/<feature>/api.ts` → then `invalidateAll()` reloads from the
   server. The server is the only state; the client keeps nothing but transient
   drag and form state.
+- **Navigation:** the app shell (`routes/+layout.svelte`) is a sidebar with
+  pages from `src/lib/nav.ts`, the projects list (each links to the board
+  filtered by that project), and global actions (Check for new). A new page is
+  one entry in `nav.ts`. Filters and selections live in the URL
+  (`/?project=…`, `/digests?run=…`) so they survive reloads and can be linked.
 - **Forms** are driven by `features/<feature>/fields.ts` and rendered with
   `FieldInput`. A new field is one line there; a new input kind is one branch
-  in `FieldInput.svelte`.
+  in `FieldInput.svelte`. `select` fields take their options at render time
+  from the form's `sources` (e.g. the project list); `half: true` pairs two
+  short fields on one row.
+- **Frequent edits get a one-click control on the card** (the estimate chip,
+  the Project submenu); the dialog remains the place for everything.
+- **Board layout:** each container is a panel that scrolls internally; day
+  panels sit in a wrapping grid. When a filter hides items, drag placement is
+  expressed as "after this visible item" and translated to an index over the
+  full container (Board `indexAfter`).
+- **Colour** is for meaning only: projects carry a colour from the fixed
+  palette in `features/projects/colors.ts` (stripe + dot); everything else stays
+  neutral.
 - **Components:** use shadcn-svelte from `$lib/components/ui`. Add more with
   `pnpm dlx shadcn-svelte@latest add <name>`.
 - **Look:** neutral stone palette, one accent use at a time (e.g. overdue in

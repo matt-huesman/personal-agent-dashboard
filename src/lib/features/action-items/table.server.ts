@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { check, date, index, integer, jsonb, pgTable, text } from 'drizzle-orm/pg-core';
+import { boolean, check, date, index, integer, jsonb, pgTable, text } from 'drizzle-orm/pg-core';
 import { isoTimestamp } from '$lib/server/columns';
+import { projects } from '$lib/features/projects/table.server';
 import type { Equal } from '$lib/types';
 import type { Link } from '$lib/schema-primitives';
 import { ACTION_ITEM_STATUSES, PRIORITIES, type ActionItemRecord } from './schema';
@@ -17,6 +18,9 @@ export const actionItems = pgTable(
 		due_date: date({ mode: 'string' }),
 		priority: text({ enum: PRIORITIES }).notNull(),
 		links: jsonb().$type<Link[]>().notNull(),
+		estimate_minutes: integer(),
+		project_id: text().references(() => projects.id, { onDelete: 'set null' }),
+		sticky: boolean().notNull().default(false),
 		status: text({ enum: ACTION_ITEM_STATUSES }).notNull(),
 		scheduled_date: date({ mode: 'string' }),
 		created_at: isoTimestamp().notNull(),
@@ -32,6 +36,8 @@ export const actionItems = pgTable(
 			or (${t.status} = 'scheduled' and ${t.scheduled_date} is not null and ${t.completed_at} is null)
 			or (${t.status} = 'done' and ${t.completed_at} is not null)`
 		),
+		// A weekly task repeats on its day's weekday, so it must have a day.
+		check('action_items_sticky_has_day', sql`not ${t.sticky} or ${t.scheduled_date} is not null`),
 		index('action_items_container_idx').on(t.scheduled_date, t.position)
 	]
 );

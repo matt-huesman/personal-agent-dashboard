@@ -1,31 +1,9 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
-	import { toast } from 'svelte-sonner';
-	import { Button } from '$lib/components/ui/button';
+	import XIcon from '@lucide/svelte/icons/x';
 	import Board from '$lib/features/action-items/components/Board.svelte';
-	import type { IngestReport } from '$lib/ingest/run.server';
+	import { projectColors } from '$lib/features/projects/colors';
 
 	let { data } = $props();
-
-	let checking = $state(false);
-
-	async function checkForNew() {
-		checking = true;
-		const res = await fetch('/api/ingest', { method: 'POST' });
-		checking = false;
-		if (!res.ok) {
-			toast.error("Couldn't check for new items", { description: (await res.json()).message });
-			return;
-		}
-
-		const report: IngestReport = await res.json();
-		const added = report.ingested.reduce((sum, run) => sum + run.inserted, 0);
-		toast(added ? `${added} new item${added === 1 ? '' : 's'}` : 'Nothing new');
-		for (const failure of report.failed) {
-			toast.error(`Couldn't ingest ${failure.ref}`, { description: failure.error });
-		}
-		await invalidateAll();
-	}
 
 	const heading = $derived(
 		new Date(`${data.today}T00:00:00Z`).toLocaleDateString('en-US', {
@@ -35,20 +13,34 @@
 			timeZone: 'UTC'
 		})
 	);
+	const filtered = $derived(data.projects.find((p) => p.id === data.projectFilter));
 </script>
 
-<svelte:head><title>Action items</title></svelte:head>
+<svelte:head><title>Board</title></svelte:head>
 
-<main class="mx-auto max-w-[1700px] px-6 py-10 sm:px-10">
-	<header class="mb-10 flex items-end justify-between gap-4">
+<main class="px-6 py-6 sm:px-8">
+	<header class="mb-6 flex flex-wrap items-end justify-between gap-3">
 		<div>
 			<p class="text-sm text-muted-foreground">{heading}</p>
-			<h1 class="text-2xl font-semibold tracking-tight">Action items</h1>
+			<h1 class="text-2xl font-semibold tracking-tight">Board</h1>
 		</div>
-		<Button variant="outline" size="sm" disabled={checking} onclick={checkForNew}>
-			{checking ? 'Checking…' : 'Check for new'}
-		</Button>
+		{#if filtered}
+			<a
+				href="/"
+				class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm hover:bg-muted"
+				title="Show all projects"
+			>
+				<span class="size-2 rounded-full" style:background={projectColors[filtered.color]}></span>
+				{filtered.name}
+				<XIcon class="size-3.5 text-muted-foreground" />
+			</a>
+		{/if}
 	</header>
 
-	<Board items={data.items} today={data.today} />
+	<Board
+		items={data.items}
+		today={data.today}
+		projects={data.projects}
+		projectFilter={filtered ? filtered.id : null}
+	/>
 </main>

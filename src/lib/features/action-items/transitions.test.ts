@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { can, completed, moved, reopened } from './transitions';
+import { can, completed, moved, nextOccurrence, reopened } from './transitions';
 
 describe('action-item transitions', () => {
 	it('allows exactly the documented commands per status', () => {
@@ -14,6 +14,12 @@ describe('action-item transitions', () => {
 	it('derives status from the target container', () => {
 		expect(moved(null)).toEqual({ status: 'pool', scheduled_date: null, completed_at: null });
 		expect(moved('2026-09-25').status).toBe('scheduled');
+	});
+
+	it('finds the next occurrence of a weekday on or after today', () => {
+		expect(nextOccurrence('2026-09-21', '2026-09-24')).toBe('2026-09-28'); // Mon → next Mon
+		expect(nextOccurrence('2026-09-24', '2026-09-24')).toBe('2026-09-24'); // today stays
+		expect(nextOccurrence('2026-08-31', '2026-09-24')).toBe('2026-09-28'); // weeks behind
 	});
 
 	it('keeps the day through complete and reopen', () => {

@@ -17,6 +17,14 @@ export function addDays(day: string, n: number): string {
 	return d.toISOString().slice(0, 10);
 }
 
+/** "2026-09-28" → "Monday". */
+export function weekdayName(day: string): string {
+	return new Date(`${day}T00:00:00Z`).toLocaleDateString('en-US', {
+		weekday: 'long',
+		timeZone: 'UTC'
+	});
+}
+
 export function formatDay(day: string, relativeTo: string): string {
 	if (day === relativeTo) return 'Today';
 	if (day === addDays(relativeTo, 1)) return 'Tomorrow';

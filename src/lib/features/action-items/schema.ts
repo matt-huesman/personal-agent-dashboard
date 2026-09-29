@@ -28,7 +28,13 @@ const content = {
 	description: z.string().nullable(),
 	due_date: isoDate.nullable(), // intrinsic deadline from the email ("reply by Fri")
 	priority,
-	links: z.array(link)
+	links: z.array(link),
+	estimate_minutes: z
+		.number()
+		.int()
+		.min(1)
+		.max(24 * 60)
+		.nullable() // how long the user expects it to take
 };
 
 // --- Wire contract -----------------------------------------------------------
@@ -40,6 +46,7 @@ export const actionItem = z.object({
 	...content,
 	priority: content.priority.default('normal'),
 	links: content.links.default([]),
+	estimate_minutes: content.estimate_minutes.default(null),
 	status: actionItemStatus.default('pool'),
 	scheduled_date: isoDate.nullable(), // the day the USER assigned it to (distinct from due_date)
 	created_at: isoDateTime // when the item first entered the system
@@ -47,6 +54,8 @@ export const actionItem = z.object({
 
 // --- Persisted record --------------------------------------------------------
 export const actionItemRecord = actionItem.extend({
+	project_id: z.string().nullable(), // the user's theme for this task (features/projects)
+	sticky: z.boolean(), // repeats weekly on its day's weekday; see transitions.ts
 	position: z.number().int(), // order within its container (the pool, or one day)
 	completed_at: isoDateTime.nullable(),
 	updated_at: isoDateTime,
@@ -60,10 +69,15 @@ export const createActionItemInput = z.object({
 	due_date: content.due_date.default(null),
 	priority: content.priority.default('normal'),
 	links: content.links.default([]),
+	estimate_minutes: content.estimate_minutes.default(null),
+	project_id: z.string().nullable().default(null),
+	sticky: z.boolean().default(false),
 	scheduled_date: isoDate.nullable().default(null) // create straight onto a day
 });
 
-export const updateActionItemInput = z.object(content).partial();
+export const updateActionItemInput = z
+	.object({ ...content, project_id: z.string().nullable(), sticky: z.boolean() })
+	.partial();
 
 export const moveActionItemInput = z.object({
 	scheduled_date: isoDate.nullable(), // null = the pool

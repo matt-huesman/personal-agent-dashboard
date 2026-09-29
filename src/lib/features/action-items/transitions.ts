@@ -5,7 +5,13 @@
 //   pool | scheduled ──complete──▶ done ──reopen──▶ scheduled (if dated) | pool
 //
 // Edits and soft-delete are legal in every state and don't change placement.
+//
+// Time passing (applied when the board loads, see service.server.ts):
+//   ordinary item, day passed, not done  ──▶ rolls into today
+//   sticky item, day passed, done or not ──▶ nextOccurrence(), reset to scheduled
+// Sticky ("repeat weekly") needs a day: moving to the pool turns it off.
 
+import { addDays } from '$lib/dates';
 import type { ActionItemRecord, ActionItemStatus } from './schema';
 
 export const commandsFrom = {
@@ -32,4 +38,11 @@ export function completed(item: Placement, now: string): Placement {
 
 export function reopened(item: Placement): Placement {
 	return moved(item.scheduled_date);
+}
+
+/** The same weekday as `day`, on or after `today`. */
+export function nextOccurrence(day: string, today: string): string {
+	let next = day;
+	while (next < today) next = addDays(next, 7);
+	return next;
 }

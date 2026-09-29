@@ -61,6 +61,7 @@ export function buildEnvelope(draft: EnvelopeDraft, window: RunWindow, now: Date
 			return {
 				...item,
 				id: itemId(item.source_message_id, index),
+				estimate_minutes: null, // the owner estimates, for now
 				source_run_id: run_id,
 				status: 'pool',
 				scheduled_date: null,

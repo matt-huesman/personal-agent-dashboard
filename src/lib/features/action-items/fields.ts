@@ -4,8 +4,10 @@ import { priority, type UpdateActionItemInput } from './schema';
 /** The edit form, in display order. Keys are checked against the update schema. */
 export const actionItemFields: FieldConfig<Required<UpdateActionItemInput>>[] = [
 	{ key: 'title', label: 'Title', kind: 'text' },
+	{ key: 'project_id', label: 'Project', kind: 'select', source: 'projects', half: true },
+	{ key: 'estimate_minutes', label: 'Estimate', kind: 'duration', half: true },
+	{ key: 'due_date', label: 'Due', kind: 'date', half: true },
+	{ key: 'priority', label: 'Priority', kind: 'enum', options: priority.options, half: true },
 	{ key: 'description', label: 'Notes', kind: 'textarea' },
-	{ key: 'due_date', label: 'Due', kind: 'date' },
-	{ key: 'priority', label: 'Priority', kind: 'enum', options: priority.options },
 	{ key: 'links', label: 'Links', kind: 'links' }
 ];

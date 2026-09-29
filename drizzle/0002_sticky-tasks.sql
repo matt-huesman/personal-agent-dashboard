@@ -1,0 +1,2 @@
+ALTER TABLE "action_items" ADD COLUMN "sticky" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "action_items" ADD CONSTRAINT "action_items_sticky_has_day" CHECK (not "action_items"."sticky" or "action_items"."scheduled_date" is not null);

@@ -57,9 +57,19 @@ The dev server and the Docker app share the same database.
   published run up to now, so no mail is missed or read twice, even if a run
   fails.
 
-- **Board:** the pool, then today and the next six days, then a "Later" column
-  for anything further out. Drag cards between and within columns, or use a
-  card's ⋯ menu. Click a title to edit. The circle marks an item done.
+- **Board:** the pool beside a wrapping grid of day panels (today + six days,
+  then "Later"). Each panel scrolls on its own. Drag cards between and within
+  panels, or use a card's ⋯ menu. Click a title to edit; the circle marks it done.
+- **Weekly tasks:** mark a task on a day "Repeat weekly" (⋯ menu or edit
+  dialog). Checked off or not, it comes back on that weekday next week, and it
+  never rolls into the following day.
+- **Estimates:** the clock chip on every card sets an estimate in one click
+  (15m–4h or custom); day headers total them and flag unestimated items.
+- **Projects:** colour-coded themes (stripe + dot on each task). The sidebar
+  lists them with open counts; click one to filter the board. Manage at `/projects`.
+- **Digests:** each email-agent run as a morning/afternoon/evening briefing:
+  FYIs, suggested replies (copyable), new tasks and possible spam, each linked
+  to its email.
 - **Roll-over:** unfinished items on a past day move to the top of today
   automatically. This happens on page load, with no background job.
 - **Idempotent ingest:** a file that was already ingested is skipped. An item
