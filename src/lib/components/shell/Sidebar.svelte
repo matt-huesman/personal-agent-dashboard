@@ -5,21 +5,37 @@
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import SettingsIcon from '@lucide/svelte/icons/settings-2';
 	import { toast } from 'svelte-sonner';
+	import PlugIcon from '@lucide/svelte/icons/plug';
 	import { navItems } from '$lib/nav';
 	import { projectColors } from '$lib/features/projects/colors';
 	import type { ProjectSummary } from '$lib/features/projects/schema';
 	import type { IngestReport } from '$lib/ingest/run.server';
+	import { integrationsApi } from '$lib/integrations/api';
+	import type { ConnectionSummary } from '$lib/integrations/schema';
 
-	let { projects }: { projects: ProjectSummary[] } = $props();
+	let { projects, connections }: { projects: ProjectSummary[]; connections: ConnectionSummary[] } =
+		$props();
 
 	const path = $derived(page.url.pathname);
 	const activeProject = $derived(path === '/' ? page.url.searchParams.get('project') : null);
+
+	/** The current page with the integrations panel open. */
+	const integrationsHref = $derived.by(() => {
+		const url = new URL(page.url);
+		url.searchParams.set('panel', 'integrations');
+		return `${url.pathname}${url.search}`;
+	});
+	const needsAttention = $derived(connections.some((c) => c.status === 'error'));
 
 	let checking = $state(false);
 
 	async function checkForNew() {
 		checking = true;
-		const res = await fetch('/api/ingest', { method: 'POST' });
+		// Every source at once: the email pipeline and all connected integrations.
+		const [res] = await Promise.all([
+			fetch('/api/ingest', { method: 'POST' }),
+			integrationsApi.sync({ all: true }).catch((e: Error) => toast.error(e.message))
+		]);
 		checking = false;
 		if (!res.ok) {
 			toast.error("Couldn't check for new items", { description: (await res.json()).message });
@@ -107,7 +123,19 @@
 		</ul>
 	</section>
 
-	<div class="mt-auto">
+	<div class="mt-auto flex flex-col gap-0.5">
+		<a
+			href={integrationsHref}
+			class={linkClass(page.url.searchParams.get('panel') === 'integrations')}
+			data-sveltekit-noscroll
+		>
+			<PlugIcon class="size-4" />
+			<span class="flex-1">Integrations</span>
+			{#if needsAttention}
+				<span class="size-2 rounded-full bg-destructive" title="A connection needs attention"
+				></span>
+			{/if}
+		</a>
 		<button
 			type="button"
 			class={[linkClass(false), 'w-full disabled:opacity-60']}

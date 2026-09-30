@@ -1,5 +1,8 @@
 <script lang="ts">
+	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { Switch } from '$lib/components/ui/switch';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import * as Select from '$lib/components/ui/select';
 	import { fromClock, toClock } from '$lib/dates';
@@ -69,12 +72,33 @@
 			{/each}
 		</Select.Content>
 	</Select.Root>
+{:else if field.kind === 'multiselect'}
+	{@const selected = value as string[]}
+	<div {id} class="flex max-h-64 flex-col gap-0.5 overflow-y-auto rounded-md border p-1">
+		{#each options as option (option.value)}
+			<Label
+				class="flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 font-normal hover:bg-muted"
+			>
+				<Checkbox
+					checked={selected.includes(option.value)}
+					onCheckedChange={(on) =>
+						(value = on ? [...selected, option.value] : selected.filter((v) => v !== option.value))}
+				/>
+				{@render dot(option.color)}
+				<span class="truncate">{option.label}</span>
+			</Label>
+		{:else}
+			<p class="px-2 py-1.5 text-sm text-muted-foreground">Loading…</p>
+		{/each}
+	</div>
 {:else if field.kind === 'duration'}
 	<DurationInput
 		{id}
 		required={field.required}
 		bind:value={() => value as number | null, (v) => (value = v)}
 	/>
+{:else if field.kind === 'boolean'}
+	<Switch {id} checked={value as boolean} onCheckedChange={(on) => (value = on)} />
 {:else if field.kind === 'time'}
 	<Input
 		{id}

@@ -3,9 +3,12 @@
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button';
-	import { digestLabel, gmailLink, type Digest } from '../digest';
+	import { digestAccounts, digestLabel, gmailLink, parseSourceId, type Digest } from '../digest';
 
 	let { digest }: { digest: Digest } = $props();
+
+	// With several linked accounts, each item says which mailbox it came from.
+	const accounts = $derived(digestAccounts(digest));
 
 	const stamp = (iso: string, withDay = true) =>
 		new Date(iso).toLocaleString('en-US', {
@@ -36,8 +39,11 @@
 		target="_blank"
 		rel="noreferrer"
 		class="inline-flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground"
+		title={parseSourceId(id).account ?? undefined}
 	>
-		Email<ArrowUpRightIcon class="size-3" />
+		{accounts.length > 1
+			? (parseSourceId(id).account?.split('@')[0] ?? 'Email')
+			: 'Email'}<ArrowUpRightIcon class="size-3" />
 	</a>
 {/snippet}
 
@@ -54,7 +60,9 @@
 			{digestLabel(digest.generated_at).toLowerCase()} digest
 		</h1>
 		<p class="mt-1 text-sm text-muted-foreground">
-			Mail from {stamp(digest.window.since)} to {stamp(digest.window.until)}
+			Mail from {stamp(digest.window.since)} to {stamp(digest.window.until)}{accounts.length > 1
+				? ` · ${accounts.length} accounts`
+				: ''}
 		</p>
 	</header>
 

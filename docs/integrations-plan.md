@@ -1,7 +1,35 @@
 # Integrations platform: plan
 
-Status: **proposal, not built yet.** First integration to build on it: Google
-Calendar (selected calendars → busy time for the planner).
+Status: **phases 0–1 built**, plus the iCal feed from phase 2 and **Gmail
+(multi-account) with the email agent moved onto the platform**. Code is in
+`src/lib/integrations/`. Where the build differs from this plan:
+
+- **Stream semantics decide storage.** `events` are **snapshots**: the
+  complete set for a window (7 days back to 60 ahead), and storage is made to
+  match. `messages` are **append**: new since the connector's cursor, stored
+  insert-or-ignore and pruned after 14 days. Connectors can keep a cursor,
+  which the engine stores and only advances when the data is stored.
+- **Email is split into a deterministic source and an AI stage.** The
+  `gmail` connector (one connection per account) syncs mail into the
+  dashboard. New mail is handed to the scheduled Claude routine as inbox
+  batches on Drive, encrypted with `INBOX_KEY`. The routine triages every
+  pending batch across all accounts in one pass. Its envelope lists the
+  batches it covered (`input_batches`); when that envelope is ingested, the
+  batches are marked consumed and deleted from Drive. Message ids are
+  `<account>/<id>`, so they stay unique and link to the right mailbox.
+- **Background sync, where something depends on it.** Manifests can opt in
+  (`backgroundSync`). Gmail does, so mail is ready before the routine's
+  scheduled runs even with no page open: one 5-minute check in the server
+  process.
+- **Freshness is driven by the browser.** Page loads never wait on a
+  provider. The browser syncs stale connections right after load, when the tab
+  regains focus, and every minute, then refreshes the page's data.
+  **Check for new** syncs everything, and each connection has **Sync now**.
+- **Read-only is visible.** Each manifest declares `readOnly`, every stored
+  event carries it, and the calendar marks those events with a lock.
+- **Decisions made:** Google OAuth for Google Calendar, iCal as the generic
+  fallback; credentials encrypted in Postgres with `APP_SECRET`; lazy sync
+  plus Sync now plus the freshness loop; the platform first.
 
 ## Why
 

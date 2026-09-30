@@ -10,8 +10,10 @@ export type FieldKind =
 	| 'date' // nullable ISO day
 	| 'enum' // one of static `options`
 	| 'select' // nullable id, options supplied at runtime from `source`
+	| 'multiselect' // string[] of ids, options supplied at runtime from `source`
 	| 'duration' // whole minutes (nullable unless `required`)
 	| 'time' // minutes since midnight, as a clock time
+	| 'boolean' // on/off
 	| 'links'; // Link[]
 
 /** A runtime choice for a `select` field; `color` shows as a dot. */

@@ -10,9 +10,6 @@ import { envelope, type Envelope } from '$lib/ingest/envelope';
 
 export const PRODUCER = 'email-digest';
 
-/** Look-back for the very first run, when Drive has no previous envelope. */
-const FIRST_RUN_LOOKBACK_MS = 24 * 60 * 60 * 1000;
-
 export const actionItemDraft = actionItem
 	.pick({ title: true, description: true, due_date: true, priority: true, links: true })
 	.extend({ source_message_id: z.string() });
@@ -24,19 +21,8 @@ export const envelopeDraft = envelope
 export type EnvelopeDraft = z.infer<typeof envelopeDraft>;
 export type RunWindow = Envelope['window'];
 
-/** Each run starts where the last published one ended, so no mail is skipped or read twice. */
-export function nextWindow(previous: Envelope | null, now: Date): RunWindow {
-	return {
-		since: previous?.window.until ?? new Date(now.getTime() - FIRST_RUN_LOOKBACK_MS).toISOString(),
-		until: now.toISOString()
-	};
-}
-
-/** Gmail search operators for a window (epoch seconds; `after` is inclusive). */
-export function gmailQuery(window: RunWindow): string {
-	const seconds = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
-	return `in:inbox after:${seconds(window.since)} before:${seconds(window.until)}`;
-}
+/** What this run covered: the inbox batches it triaged and the mail's time span. */
+export type RunInputs = { window: RunWindow; input_batches: string[] };
 
 /** Stable id: the same email always yields the same ids, so re-sends are idempotent. */
 export function itemId(source_message_id: string, index: number): string {
@@ -44,9 +30,9 @@ export function itemId(source_message_id: string, index: number): string {
 	return `ai_${hash.slice(0, 12)}`;
 }
 
-export function buildEnvelope(draft: EnvelopeDraft, window: RunWindow, now: Date): Envelope {
-	const run_id = `${PRODUCER}-${window.until}`;
+export function buildEnvelope(draft: EnvelopeDraft, run: RunInputs, now: Date): Envelope {
 	const generated_at = now.toISOString();
+	const run_id = `${PRODUCER}-${generated_at}`;
 	const perMessage = new Map<string, number>();
 
 	return {
@@ -54,7 +40,8 @@ export function buildEnvelope(draft: EnvelopeDraft, window: RunWindow, now: Date
 		run_id,
 		generated_at,
 		source: PRODUCER,
-		window,
+		window: run.window,
+		input_batches: run.input_batches,
 		action_items: draft.action_items.map((item) => {
 			const index = perMessage.get(item.source_message_id) ?? 0;
 			perMessage.set(item.source_message_id, index + 1);
@@ -75,7 +62,7 @@ export function buildEnvelope(draft: EnvelopeDraft, window: RunWindow, now: Date
 }
 
 /** e.g. "email-digest-20260924T130000Z.json" — name order is chronological order. */
-export function envelopeFileName(window: RunWindow): string {
-	const stamp = window.until.replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+export function envelopeFileName(generatedAt: string): string {
+	const stamp = generatedAt.replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
 	return `${PRODUCER}-${stamp}.json`;
 }

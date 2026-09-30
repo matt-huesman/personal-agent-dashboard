@@ -101,6 +101,11 @@ export async function uploadJson(
 	return res.json();
 }
 
+/** Permanently delete a file this app created (drive.file allows exactly that). */
+export async function deleteFile(fileId: string): Promise<void> {
+	await drive(`${API}/files/${fileId}`, { method: 'DELETE' });
+}
+
 export async function createFolder(name: string): Promise<DriveFile> {
 	const res = await drive(`${API}/files?fields=id,name`, {
 		method: 'POST',

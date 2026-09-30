@@ -6,7 +6,7 @@ import { listDigests } from './service.server';
 
 useTestDb();
 
-const fixture = JSON.parse(await readFile('data/incoming/run-2026-09-24-0800.json', 'utf8'));
+const fixture = JSON.parse(await readFile('src/test/fixtures/envelope.json', 'utf8'));
 
 describe('digests', () => {
 	it('presents each ingested run as a digest, newest first', async () => {

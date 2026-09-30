@@ -7,7 +7,7 @@ import type { EnvelopeSource } from './source';
 
 useTestDb();
 
-const fixture = JSON.parse(await readFile('data/incoming/run-2026-09-24-0800.json', 'utf8')) as {
+const fixture = JSON.parse(await readFile('src/test/fixtures/envelope.json', 'utf8')) as {
 	run_id: string;
 	action_items: { id: string }[];
 };

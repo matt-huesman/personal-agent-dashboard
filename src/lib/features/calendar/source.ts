@@ -1,30 +1,16 @@
-// Where calendar events come from. The planner treats every event as busy
-// time and schedules tasks around it.
-//
-// ┌─ CALENDAR INTEGRATION SWAP POINT ────────────────────────────────────────┐
-// │ Today: noCalendar, so every day is open.                                 │
-// │ Later: e.g. a Google Calendar source (Calendar API, events.list with     │
-// │ timeMin/timeMax, singleEvents=true) implements events() and replaces     │
-// │ noCalendar in calendar.server.ts. Several sources can be merged. The     │
-// │ planner and the UI already render busy blocks.                           │
-// └───────────────────────────────────────────────────────────────────────────┘
+// What the calendar view and planner consume: events for a range of days.
+// Events arrive through integrations (src/lib/integrations) and are stored in
+// calendar_events; calendar.server.ts reads them. Every timed, busy event is
+// time the planner schedules around.
 
-import { z } from 'zod';
-import { isoDateTime } from '$lib/schema-primitives';
+import type { StoredEventRecord } from './schema';
 
-export const calendarEvent = z.object({
-	id: z.string(),
-	title: z.string(),
-	start: isoDateTime,
-	end: isoDateTime,
-	all_day: z.boolean().default(false) // all-day events are shown but don't block time
-});
-
-export type CalendarEvent = z.infer<typeof calendarEvent>;
+export type CalendarEvent = Pick<
+	StoredEventRecord,
+	'title' | 'start' | 'end' | 'all_day' | 'busy' | 'read_only' | 'calendar_name' | 'url'
+> & { id: string; source: string /* integration name, e.g. "Google Calendar" */ };
 
 export interface CalendarSource {
 	/** Events overlapping the local days `from`..`to` (inclusive, "YYYY-MM-DD"). */
 	events(from: string, to: string): Promise<CalendarEvent[]>;
 }
-
-export const noCalendar: CalendarSource = { events: async () => [] };

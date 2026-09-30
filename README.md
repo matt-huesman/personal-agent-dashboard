@@ -42,20 +42,27 @@ The dev server and the Docker app share the same database.
 ## How it works
 
 ```
- CLOUD (Claude Code routine, on a schedule)
- Gmail ──▶ Claude classifies ──▶ draft.json ──▶ pnpm producer publish ──▶ Google Drive
-          (agents/email-digest.md)             (ids, window, Zod-checked)   "Agent Dashboard Inbox"
-                                                                                  │
- LOCAL (Docker)                                                                   ▼
- UI ◀── page load / JSON API ◀── service.server.ts ◀── insert-or-ignore ◀── Zod ◀── DriveSource
+ LOCAL (Docker)                                           CLOUD (Claude routine, 7am / 5pm)
+ Gmail accounts ──▶ gmail connector ──▶ email_messages
+  (one connection each,     (background sync)   │
+   read-only OAuth)                             ▼ publishInbox
+                                   inbox batch (encrypted, INBOX_KEY) ──▶ Drive ──▶ pnpm producer start
+                                                                                   │  (all accounts, one inbox)
+                                                                                   ▼
+                                                                  Claude triages ──▶ pnpm producer publish
+                                                                                   │
+ UI ◀── service ◀── insert-or-ignore ◀── Zod ◀── DriveSource ◀── envelope (lists input_batches) ◀┘
+                        └── consumeBatches: mark done, delete the batch from Drive
 ```
 
-- **The producer and the dashboard share one contract:** the producer builds
-  its envelope with the same Zod schema the dashboard ingests with
-  (`src/lib/ingest/envelope.ts`).
-- **Windows chain:** each run reads mail from the end of the previous
-  published run up to now, so no mail is missed or read twice, even if a run
-  fails.
+- **The producer and the dashboard share contracts:** the envelope
+  (`src/lib/ingest/envelope.ts`) and the inbox batch
+  (`src/lib/features/email/batch.ts`) are each defined once and used by both.
+- **No mail is missed or triaged twice.** Batches are claimed atomically in
+  the database, a run covers every pending batch, and its envelope records
+  which ones.
+- **The routine never holds mail credentials.** It only sees encrypted
+  batches, and Drive only ever holds ciphertext.
 
 - **Board:** the pool beside a wrapping grid of day panels (today + six days,
   then "Later"). Each panel scrolls on its own. Drag cards between and within
@@ -70,6 +77,11 @@ The dev server and the Docker app share the same database.
   (15m–4h or custom); day headers total them and flag unestimated items.
 - **Projects:** colour-coded themes (stripe + dot on each task). The sidebar
   lists them with open counts; click one to filter the board. Manage at `/projects`.
+- **Integrations:** open **Integrations** in the sidebar to connect Google
+  Calendar (choose which calendars) or any iCal feed (Outlook, Apple, Canvas…).
+  Events sync automatically while the app is open, appear on the calendar
+  with a lock (read-only), and become busy time for the planner. Credentials
+  are encrypted with `APP_SECRET`. See [docs/integrations-plan.md](docs/integrations-plan.md).
 - **Calendar:** a week view that time-blocks each day's tasks automatically.
   It batches tasks by project to minimise context switching, caps focus
   sessions (default 90 min) with breaks, puts urgent and deep work first,

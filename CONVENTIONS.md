@@ -62,9 +62,19 @@ src/
                                   read-only view over ingest_runs, no table —
                                   planner — the pure scheduling algorithm +
                                   its settings — and calendar — the week view,
-                                  CalendarSource, and planner glue)
+                                  synced events, and planner glue)
+    integrations/                 the integrations platform (see below)
+      registry.ts                 every manifest, in catalog order
+      <id>/manifest.ts            data: auth, config schema + fields, streams
+      <id>/connector.server.ts    code: describe, options, pull
+      connectors.server.ts        id → connector
+      streams.ts                  standard records (event, …) — the boundary
+      sync.server.ts              the engine; mappers.server.ts applies streams
+      auth/oauth2.server.ts       generic OAuth2 + PKCE; providers are data
+      components/                 catalog dialog, freshness loop
   routes/
-    +layout.server.ts             shell data (projects) + throttled auto-ingest
+    +layout.server.ts             shell data (projects, connections) + auto-ingest
+    integrations/                 OAuth connect + callback
     +page.svelte                  the board;  digests/, projects/ are sibling pages
     api/<feature>/...             JSON API
   test/                           test setup (global migrate, useTestDb)
@@ -231,9 +241,40 @@ there's no per-week history.
 - **Glue is separate** (`features/calendar/plan.ts`): which tasks belong to a
   day, the batching key (`contextOf`: project, else email follow-up, else
   other), and events as busy time. Change grouping there, not in the algorithm.
-- **Calendar integrations** implement `CalendarSource` and are wired in
-  `calendar.server.ts`. The planner already treats every timed event as busy
-  and the week view already renders them.
+- **Calendar events come from integrations** (the `event` stream, stored in
+  `calendar_events`). The planner treats timed, busy events as blocked time;
+  all-day and "free" events are shown but not planned around.
+
+## Integrations
+
+The contract is documented in `docs/integrations-plan.md`. The rules:
+
+- **Every integration takes the same path:** manifest → connect → configure →
+  sync → show. Don't add special cases to the engine, routes or catalog.
+- **A connector only produces streams** (`streams.ts`). It never writes app
+  tables; mappers do, once per stream.
+- **Stream semantics are fixed per stream** (`streams.ts`). `events` are
+  snapshots, and storage is made to match. `messages` are append-only: insert-or-ignore,
+  then aged out. Connectors may keep a `cursor`, which the engine stores in the
+  same transaction as the data. Syncs are idempotent, and a failed sync keeps
+  the last good data and the old cursor.
+- **Follow-ups belong to the stream, not the integration.** Network work after
+  a sync (handing new mail to the email agent) runs in `afterApply`, outside
+  the transaction.
+- **Secrets:** credentials are `encrypt()`ed (`server/crypto.ts`, `APP_SECRET`),
+  decrypted only inside `service.server.ts`, and never sent to the browser
+  (`ConnectionSummary` omits them). Request the narrowest read-only scopes.
+- **Freshness:** each manifest sets `syncEveryMinutes`. The browser's
+  `Freshness` loop syncs stale connections without blocking page loads. Set
+  `backgroundSync` only when something depends on the data while no page is
+  open (Gmail → the scheduled agent).
+- **AI stages get data, not access.** A scheduled routine never holds
+  integration credentials. The dashboard syncs the data deterministically and
+  hands the routine only what it needs, encrypted (`INBOX_KEY`), on Drive.
+- **Adding an integration:** manifest + connector + register it in
+  `registry.ts` and `connectors.server.ts` + a test of `pull()` with a fake
+  `fetch`. A new OAuth provider is an entry in `auth/oauth2.server.ts`. A new
+  stream is a schema + mapper + migration. No UI work.
 - The page loads data only; the plan is `$derived` in the browser and
   recomputed every minute, so today always plans from now.
 

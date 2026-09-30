@@ -37,9 +37,10 @@ export const envelope = z.object({
 	generated_at: isoDateTime,
 	source: z.string(), // producer name, e.g. "email-digest"
 	window: z.object({
-		since: isoDateTime,
+		since: isoDateTime, // received time of the earliest message covered
 		until: isoDateTime
 	}),
+	input_batches: z.array(z.string()).default([]), // inbox batches this run triaged (features/email)
 	action_items: z.array(actionItem),
 	suggested_replies: z.array(suggestedReply).default([]),
 	spam_candidates: z.array(spamCandidate).default([]),

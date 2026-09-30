@@ -6,6 +6,9 @@
 	import type { DayPlan } from '$lib/features/planner/planner';
 	import type { PlannerSettings } from '$lib/features/planner/schema';
 	import type { ContextStyle } from '../contexts';
+	import { allDayOn, timedOn } from '../plan';
+	import type { CalendarEvent } from '../source';
+	import EventBlock from './EventBlock.svelte';
 	import TimelineBlock from './TimelineBlock.svelte';
 
 	let {
@@ -14,6 +17,7 @@
 		now,
 		plans,
 		items,
+		events,
 		settings,
 		styleOf,
 		oncomplete
@@ -23,6 +27,7 @@
 		now: Date;
 		plans: Map<string, DayPlan | null>; // null = a past day
 		items: Map<string, ActionItemRecord>;
+		events: CalendarEvent[]; // from connected calendars
 		settings: PlannerSettings;
 		styleOf: (context: string) => ContextStyle;
 		oncomplete: (item: ActionItemRecord) => void;
@@ -30,13 +35,14 @@
 
 	const PX = 1.2; // pixels per minute (72px per hour)
 
+	const timed = $derived(new Map(days.map((day) => [day, timedOn(day, events)])));
+	const allDay = $derived(new Map(days.map((day) => [day, allDayOn(day, events)])));
+
 	// Show the working day with an hour of margin, stretched to fit any events.
 	const range = $derived.by(() => {
-		const busy = [...plans.values()].flatMap(
-			(p) => p?.blocks.filter((b) => b.kind === 'busy') ?? []
-		);
-		const start = Math.min(settings.day_start, ...busy.map((b) => b.start)) - 60;
-		const end = Math.max(settings.day_end, ...busy.map((b) => b.end)) + 60;
+		const spans = [...timed.values()].flat();
+		const start = Math.min(settings.day_start, ...spans.map((t) => t.start)) - 60;
+		const end = Math.max(settings.day_end, ...spans.map((t) => t.end)) + 60;
 		return {
 			start: Math.max(0, Math.floor(start / 60) * 60),
 			end: Math.min(1440, Math.ceil(end / 60) * 60)
@@ -111,6 +117,13 @@
 						</Popover.Root>
 					{/if}
 				</div>
+				{#if allDay.get(day)?.length}
+					<div class="mt-1.5 flex flex-col gap-0.5">
+						{#each allDay.get(day) ?? [] as event (event.id)}
+							<EventBlock {event} />
+						{/each}
+					</div>
+				{/if}
 			</div>
 		{/each}
 
@@ -132,8 +145,10 @@
 		{#each days as day (day)}
 			{@const plan = plans.get(day)}
 			{@const working = plan?.blocks.some((b) => b.kind === 'task') ?? false}
-			<!-- Routine blocks (lunch) only on days with planned work, to keep empty days clean. -->
-			{@const blocks = plan?.blocks.filter((b) => working || b.kind !== 'reserved') ?? []}
+			<!-- Routine blocks (lunch) only on days with planned work, to keep empty days clean.
+			     Busy blocks are drawn from the events themselves (below), not from the plan. -->
+			{@const blocks =
+				plan?.blocks.filter((b) => b.kind !== 'busy' && (working || b.kind !== 'reserved')) ?? []}
 			<div
 				class={['relative border-l', day < today && 'bg-muted/40']}
 				style="height: {y(
@@ -150,6 +165,16 @@
 					class="absolute inset-x-0 bottom-0 bg-muted/50"
 					style="top: {y(settings.day_end)}px"
 				></div>
+
+				{#each timed.get(day) ?? [] as t (t.event.id)}
+					<EventBlock
+						timed={t}
+						event={t.event}
+						top={y(t.start)}
+						height={Math.max((t.end - t.start) * PX, 14)}
+						compact={(t.end - t.start) * PX < 30}
+					/>
+				{/each}
 
 				{#each blocks as block, i (i)}
 					<TimelineBlock

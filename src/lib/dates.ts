@@ -50,6 +50,15 @@ export function formatClock(minutes: number, suffix = false): string {
 	return suffix ? `${text} ${h24 < 12 ? 'AM' : 'PM'}` : text;
 }
 
+/** "just now", "5 min ago", "3 h ago", then a date. */
+export function formatAgo(iso: string, now = new Date()): string {
+	const minutes = Math.round((now.getTime() - Date.parse(iso)) / 60_000);
+	if (minutes < 1) return 'just now';
+	if (minutes < 60) return `${minutes} min ago`;
+	if (minutes < 24 * 60) return `${Math.round(minutes / 60)} h ago`;
+	return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 /** "2026-09-28" → "Monday". */
 export function weekdayName(day: string): string {
 	return new Date(`${day}T00:00:00Z`).toLocaleDateString('en-US', {

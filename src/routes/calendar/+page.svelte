@@ -2,11 +2,13 @@
 	import { invalidateAll } from '$app/navigation';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import LockIcon from '@lucide/svelte/icons/lock';
 	import SlidersIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button';
-	import { addDays, mondayOf } from '$lib/dates';
+	import { addDays, formatAgo, mondayOf } from '$lib/dates';
+	import { manifestOf } from '$lib/integrations/registry';
 	import { formatMinutes } from '$lib/durations';
 	import { actionItemsApi } from '$lib/features/action-items/api';
 	import type { ActionItemRecord } from '$lib/features/action-items/schema';
@@ -24,6 +26,12 @@
 		const timer = setInterval(() => (now = new Date()), 60_000);
 		return () => clearInterval(timer);
 	});
+
+	const calendarConnections = $derived(
+		data.integrations.connections.filter(
+			(c) => manifestOf(c.integration_id)?.category === 'calendar'
+		)
+	);
 
 	const days = $derived(Array.from({ length: 7 }, (_, i) => addDays(data.week, i)));
 	const items = $derived(new Map(data.items.map((i) => [i.id, i])));
@@ -153,6 +161,7 @@
 		{now}
 		{plans}
 		{items}
+		events={data.events}
 		settings={data.settings}
 		{styleOf}
 		oncomplete={complete}
@@ -176,7 +185,26 @@
 			<span class="h-2.5 w-4 rounded-sm border border-dashed border-foreground/30"></span>No
 			estimate (assumed)
 		</span>
-		<span class="ml-auto">Your calendar isn't connected yet, so every day is open.</span>
+		<span class="flex items-center gap-1.5">
+			<span class="h-2.5 w-4 rounded-sm bg-foreground/80"></span>Event
+			<LockIcon class="size-3" />read-only
+		</span>
+		<span class="ml-auto flex flex-wrap items-center gap-x-3">
+			{#each calendarConnections as c (c.id)}
+				<span class={[c.status === 'error' && 'text-destructive']} title={c.last_error ?? ''}>
+					{manifestOf(c.integration_id)?.name} · {c.account_label} ·
+					{c.status === 'error'
+						? 'needs attention'
+						: c.last_synced_at
+							? `synced ${formatAgo(c.last_synced_at, now)}`
+							: 'syncing…'}
+				</span>
+			{:else}
+				<a href="?week={data.week}&panel=integrations" class="underline-offset-2 hover:underline">
+					Connect a calendar to plan around your events
+				</a>
+			{/each}
+		</span>
 	</footer>
 </main>
 

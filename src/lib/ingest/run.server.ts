@@ -8,6 +8,7 @@
 import { z } from 'zod';
 import { db } from '$lib/server/db';
 import { insertIngested } from '$lib/features/action-items/service.server';
+import { consumeBatches } from '$lib/features/email/service.server';
 import { driveSource } from './drive-source.server';
 import { envelope } from './envelope';
 import { localSource } from './local-source.server';
@@ -73,8 +74,10 @@ export async function ingest(source: EnvelopeSource = defaultSource()): Promise<
 		});
 
 		if (inserted === null) report.skipped.push(ref);
-		else
+		else {
 			report.ingested.push({ ref, run_id: env.run_id, items: env.action_items.length, inserted });
+			await consumeBatches(env.input_batches); // the mail it covered is done: delete the batches
+		}
 	}
 
 	return report;
