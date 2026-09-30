@@ -43,6 +43,13 @@
       "when": 1790724632918,
       "tag": "0005_gmail-and-inbox-batches",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790792713066,
+      "tag": "0006_pinned-task-times",
+      "breakpoints": true
     }
   ]
 }

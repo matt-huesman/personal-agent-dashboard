@@ -24,6 +24,7 @@ const task = (
 	priority: 'normal',
 	due: false,
 	order: order++,
+	pinned: null,
 	...extra
 });
 
@@ -172,6 +173,53 @@ describe('planDay', () => {
 	it('assumes the default estimate for unestimated tasks and flags them', () => {
 		const plan = planDay({ tasks: [task('x', null)], busy: [], now: null, settings: base });
 		expect(tasksOf(plan.blocks)[0]).toMatchObject({ end: at(9, 30), estimated: true });
+	});
+
+	describe('pinned tasks', () => {
+		it('sit exactly where the user put them; everything else plans around them', () => {
+			const plan = planDay({
+				tasks: [task('gym', 60, 'Gym', { pinned: at(10) }), task('a', 60, 'A'), task('b', 30, 'A')],
+				busy: [],
+				now: null,
+				settings: base
+			});
+			const placed = tasksOf(plan.blocks);
+			expect(placed.find((b) => b.task_id === 'gym')).toMatchObject({
+				start: at(10),
+				end: at(11),
+				pinned: true,
+				parts: 1
+			});
+			// The pinned hour is fixed time: "a" fills 9–10 exactly, "b" follows the gym.
+			expect(placed.map((b) => [b.task_id, b.start])).toEqual([
+				['a', at(9)],
+				['gym', at(10)],
+				['b', at(11)]
+			]);
+		});
+
+		it('are never split or moved, even over an event or before now', () => {
+			const plan = planDay({
+				tasks: [task('deep', 150, 'A', { pinned: at(9) })],
+				busy: [{ id: 'm', title: 'Meeting', start: at(10), end: at(11) }],
+				now: at(13),
+				settings: base
+			});
+			expect(tasksOf(plan.blocks)).toEqual([
+				expect.objectContaining({ task_id: 'deep', start: at(9), end: at(11, 30), parts: 1 })
+			]);
+		});
+
+		it('count toward the daily focus limit', () => {
+			const plan = planDay({
+				tasks: [task('pin', 60, 'A', { pinned: at(9) }), task('x', 60, 'A')],
+				busy: [],
+				now: null,
+				settings: { ...base, daily_capacity_minutes: 90 }
+			});
+			expect(plan.planned_minutes).toBe(90);
+			expect(plan.overflow).toEqual([{ task_id: 'x', minutes: 30 }]);
+		});
 	});
 
 	it('returns nothing to do when the day is already over', () => {

@@ -17,6 +17,7 @@ import type {
 	ActionItemRecord,
 	CreateActionItemInput,
 	MoveActionItemInput,
+	PinActionItemInput,
 	UpdateActionItemInput
 } from './schema';
 
@@ -98,7 +99,8 @@ export async function rollOver(today = localToday()): Promise<number> {
 		const ids = overdue.map((r) => r.id);
 		await tx
 			.update(actionItems)
-			.set({ scheduled_date: today, updated_at: now() })
+			// A pinned time on a day that's gone means nothing today: let the planner place it.
+			.set({ scheduled_date: today, pinned_start: null, updated_at: now() })
 			.where(inArray(actionItems.id, ids));
 		await renumber(tx, [...ids, ...todays]);
 		return ids.length;
@@ -173,9 +175,36 @@ export async function move(
 		order.splice(index, 0, id); // an index past the end appends
 		await renumber(tx, order);
 		const placement = moved(scheduled_date);
-		// The pool has no weekday, so a weekly item stops repeating there.
-		return write(tx, id, scheduled_date === null ? { ...placement, sticky: false } : placement);
+		// The pool has no weekday or time: a weekly item stops repeating and a pin is dropped.
+		// Between days, the pinned time of day comes along.
+		return write(
+			tx,
+			id,
+			scheduled_date === null ? { ...placement, sticky: false, pinned_start: null } : placement
+		);
 	});
+}
+
+/**
+ * Put the item on a day at a time the user chose (dragging it on the
+ * calendar). A weekly item keeps that time every week.
+ */
+export async function pin(
+	id: string,
+	{ scheduled_date, start }: PinActionItemInput
+): Promise<ActionItemRecord> {
+	return db.transaction(async (tx) => {
+		const item = await find(tx, id);
+		assertCan('move', item);
+		const position =
+			item.scheduled_date === scheduled_date ? item.position : await topOf(tx, scheduled_date);
+		return write(tx, id, { ...moved(scheduled_date), position, pinned_start: start });
+	});
+}
+
+/** Hand the item back to the planner. */
+export async function unpin(id: string): Promise<ActionItemRecord> {
+	return db.transaction((tx) => write(tx, id, { pinned_start: null }));
 }
 
 export async function complete(id: string): Promise<ActionItemRecord> {

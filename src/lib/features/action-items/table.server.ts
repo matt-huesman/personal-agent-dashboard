@@ -21,6 +21,7 @@ export const actionItems = pgTable(
 		estimate_minutes: integer(),
 		project_id: text().references(() => projects.id, { onDelete: 'set null' }),
 		sticky: boolean().notNull().default(false),
+		pinned_start: integer(),
 		status: text({ enum: ACTION_ITEM_STATUSES }).notNull(),
 		scheduled_date: date({ mode: 'string' }),
 		created_at: isoTimestamp().notNull(),
@@ -38,6 +39,11 @@ export const actionItems = pgTable(
 		),
 		// A weekly task repeats on its day's weekday, so it must have a day.
 		check('action_items_sticky_has_day', sql`not ${t.sticky} or ${t.scheduled_date} is not null`),
+		// A pinned time is a time on a day.
+		check(
+			'action_items_pin_has_day',
+			sql`${t.pinned_start} is null or ${t.scheduled_date} is not null`
+		),
 		index('action_items_container_idx').on(t.scheduled_date, t.position)
 	]
 );

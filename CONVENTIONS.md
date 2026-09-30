@@ -172,10 +172,18 @@ Action-item lifecycle, for reference:
 | delete / restore | any | soft delete / undo |
 | roll-over (automatic) | scheduled, not sticky, day < today | moves to today, above today's items |
 | weekly advance (automatic) | sticky, day < today, done or not | same weekday next occurrence, reopened, top of that day |
+| pin(day, start) | pool, scheduled | on that day at that time (`pinned_start`, minutes into the day) |
+| unpin | any | `pinned_start` cleared; the planner places it again |
 
 `sticky` ("repeat weekly") requires a day (CHECK constraint); moving a sticky
 item to the pool turns it off. It's one row that advances, not a series, so
 there's no per-week history.
+
+`pinned_start` also requires a day (CHECK). A pin is kept when an item moves
+between days and through weekly advances, so a weekly item keeps its time.
+It's cleared when an item goes to the pool, and on roll-over, because that
+time has passed. The planner treats pinned items as fixed: exact time, never
+split, and counted toward the daily cap.
 
 ## Services
 

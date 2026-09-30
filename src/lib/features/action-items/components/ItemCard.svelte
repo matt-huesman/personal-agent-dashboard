@@ -3,9 +3,10 @@
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ClockIcon from '@lucide/svelte/icons/clock';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
+	import PinIcon from '@lucide/svelte/icons/pin';
 	import RepeatIcon from '@lucide/svelte/icons/repeat';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { formatDay, weekdayName } from '$lib/dates';
+	import { formatClock, formatDay, weekdayName } from '$lib/dates';
 	import { DURATION_PRESETS, formatMinutes } from '$lib/durations';
 	import { projectColors } from '$lib/features/projects/colors';
 	import { can } from '../transitions';
@@ -97,6 +98,11 @@
 			{#if project && color}
 				<span class="inline-flex min-w-0 items-center gap-1.5">
 					{@render dot(color)}<span class="truncate">{project.name}</span>
+				</span>
+			{/if}
+			{#if item.pinned_start !== null}
+				<span class="inline-flex items-center gap-1" title="Pinned time (set on the calendar)">
+					<PinIcon class="size-3" />{formatClock(item.pinned_start, true)}
 				</span>
 			{/if}
 			{#if item.sticky && item.scheduled_date}

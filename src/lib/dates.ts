@@ -17,12 +17,6 @@ export function addDays(day: string, n: number): string {
 	return d.toISOString().slice(0, 10);
 }
 
-/** The Monday of the week containing `day`. */
-export function mondayOf(day: string): string {
-	const weekday = new Date(`${day}T00:00:00Z`).getUTCDay(); // 0 = Sunday
-	return addDays(day, -((weekday + 6) % 7));
-}
-
 // --- Time of day (minutes since local midnight) -------------------------------
 
 /** Minutes since local midnight of `day` at instant `at` (may be <0 or >1440). */

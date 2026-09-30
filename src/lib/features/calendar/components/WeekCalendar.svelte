@@ -20,7 +20,10 @@
 		events,
 		settings,
 		styleOf,
-		oncomplete
+		oncomplete,
+		onpin,
+		onunpin,
+		class: className
 	}: {
 		days: string[];
 		today: string;
@@ -31,7 +34,94 @@
 		settings: PlannerSettings;
 		styleOf: (context: string) => ContextStyle;
 		oncomplete: (item: ActionItemRecord) => void;
+		onpin: (item: ActionItemRecord, day: string, start: number) => void;
+		onunpin: (item: ActionItemRecord) => void;
+		class?: string; // sizes the scroll container; the grid scrolls inside it
 	} = $props();
+
+	// --- Dragging task blocks to pin them ----------------------------------------
+	// Press and move past a few pixels to drag; the preview snaps to 15 minutes
+	// and can change day (not into the past). A plain click still opens the
+	// block's details. Esc cancels.
+
+	const SNAP = 15;
+	const THRESHOLD = 4; // px of movement before a press becomes a drag
+	const columns: Record<string, HTMLElement> = $state({});
+
+	type Drag = {
+		item: ActionItemRecord;
+		color: string; // its context colour, for the preview
+		duration: number;
+		grabOffset: number; // minutes between the block's start and the pointer
+		from: { x: number; y: number };
+		moved: boolean;
+		day: string;
+		start: number;
+	};
+	let drag = $state<Drag | null>(null);
+
+	function grab(
+		e: PointerEvent,
+		block: { start: number; context: string },
+		item: ActionItemRecord,
+		day: string
+	) {
+		if (e.button !== 0) return;
+		const duration = item.estimate_minutes ?? settings.default_estimate_minutes;
+		const column = columns[day].getBoundingClientRect();
+		drag = {
+			item,
+			color: styleOf(block.context).color,
+			duration,
+			grabOffset: range.start + (e.clientY - column.top) / PX - block.start,
+			from: { x: e.clientX, y: e.clientY },
+			moved: false,
+			day,
+			start: block.start
+		};
+		window.addEventListener('pointermove', follow);
+		window.addEventListener('pointerup', drop, { once: true });
+		window.addEventListener('keydown', cancelOnEscape);
+	}
+
+	function follow(e: PointerEvent) {
+		if (!drag) return;
+		if (!drag.moved && Math.hypot(e.clientX - drag.from.x, e.clientY - drag.from.y) < THRESHOLD)
+			return;
+		drag.moved = true;
+		const day = days.find((d) => {
+			if (d < today) return false;
+			const r = columns[d].getBoundingClientRect();
+			return e.clientX >= r.left && e.clientX < r.right;
+		});
+		if (!day) return;
+		const minute =
+			range.start + (e.clientY - columns[day].getBoundingClientRect().top) / PX - drag.grabOffset;
+		drag.day = day;
+		drag.start = Math.min(Math.max(0, Math.round(minute / SNAP) * SNAP), 24 * 60 - drag.duration);
+	}
+
+	function drop() {
+		const done = drag;
+		stop();
+		if (!done?.moved) return; // a click: let the popover open
+		// The click that follows this pointerup would open the popover; swallow it.
+		window.addEventListener('click', (e) => e.stopPropagation(), { capture: true, once: true });
+		const unchanged =
+			done.day === done.item.scheduled_date && done.start === done.item.pinned_start;
+		if (!unchanged) onpin(done.item, done.day, done.start);
+	}
+
+	function cancelOnEscape(e: KeyboardEvent) {
+		if (e.key === 'Escape') stop();
+	}
+
+	function stop() {
+		drag = null;
+		window.removeEventListener('pointermove', follow);
+		window.removeEventListener('pointerup', drop);
+		window.removeEventListener('keydown', cancelOnEscape);
+	}
 
 	const PX = 1.2; // pixels per minute (72px per hour)
 
@@ -63,7 +153,7 @@
 	};
 </script>
 
-<div class="overflow-x-auto rounded-xl border bg-card">
+<div class={['overflow-auto rounded-xl border bg-card', className]}>
 	<div class="grid min-w-[52rem] grid-cols-[3.5rem_repeat(7,minmax(0,1fr))]">
 		<!-- Header row -->
 		<div class="sticky top-0 z-20 border-b bg-card"></div>
@@ -150,6 +240,7 @@
 			{@const blocks =
 				plan?.blocks.filter((b) => b.kind !== 'busy' && (working || b.kind !== 'reserved')) ?? []}
 			<div
+				bind:this={columns[day]}
 				class={['relative border-l', day < today && 'bg-muted/40']}
 				style="height: {y(
 					range.end
@@ -177,15 +268,33 @@
 				{/each}
 
 				{#each blocks as block, i (i)}
+					{@const item = block.kind === 'task' ? items.get(block.task_id) : undefined}
 					<TimelineBlock
 						{block}
 						top={y(block.start)}
 						height={Math.max((block.end - block.start) * PX, 3)}
-						item={block.kind === 'task' ? items.get(block.task_id) : undefined}
+						{item}
 						style={block.kind === 'task' ? styleOf(block.context) : undefined}
+						dragging={!!drag?.moved && drag.item.id === item?.id}
+						ongrab={item && block.kind === 'task' ? (e) => grab(e, block, item, day) : undefined}
 						{oncomplete}
+						{onunpin}
 					/>
 				{/each}
+
+				<!-- Where a dragged task will land. -->
+				{#if drag?.moved && drag.day === day}
+					<div
+						class="pointer-events-none absolute inset-x-1 z-20 rounded-md border-2 border-dashed px-1.5 py-1 text-xs shadow-sm"
+						style="top: {y(drag.start)}px; height: {drag.duration *
+							PX}px; border-color: {drag.color}; background: color-mix(in oklab, {drag.color} 22%, var(--background));"
+					>
+						<span class="block truncate font-medium">{drag.item.title}</span>
+						<span class="block text-[0.7rem] text-muted-foreground tabular-nums">
+							{formatClock(drag.start)}–{formatClock(drag.start + drag.duration, true)}
+						</span>
+					</div>
+				{/if}
 
 				{#if day === today && nowMinute >= range.start && nowMinute <= range.end}
 					<div class="pointer-events-none absolute inset-x-0 z-10" style="top: {y(nowMinute)}px">

@@ -1,4 +1,4 @@
-import { addDays, mondayOf, today } from '$lib/dates';
+import { addDays, today } from '$lib/dates';
 import { listBoard } from '$lib/features/action-items/service.server';
 import { calendarSource } from '$lib/features/calendar/calendar.server';
 import { getSettings } from '$lib/features/planner/service.server';
@@ -9,11 +9,13 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ url, parent }) => {
 	await parent();
 	const day = today();
-	const week = mondayOf(url.searchParams.get('week') ?? day);
+	// Seven days from `?from=` (any day), else from today: the view looks ahead.
+	const param = url.searchParams.get('from');
+	const from = param && /^\d{4}-\d{2}-\d{2}$/.test(param) ? param : day;
 	const [items, settings, events] = await Promise.all([
 		listBoard(day), // also applies roll-over and weekly repeats
 		getSettings(),
-		calendarSource.events(week, addDays(week, 6))
+		calendarSource.events(from, addDays(from, 6))
 	]);
-	return { today: day, week, items, settings, events };
+	return { today: day, from, items, settings, events };
 };

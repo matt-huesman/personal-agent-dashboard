@@ -56,6 +56,12 @@ export const actionItem = z.object({
 export const actionItemRecord = actionItem.extend({
 	project_id: z.string().nullable(), // the user's theme for this task (features/projects)
 	sticky: z.boolean(), // repeats weekly on its day's weekday; see transitions.ts
+	pinned_start: z
+		.number()
+		.int()
+		.min(0)
+		.max(24 * 60 - 1)
+		.nullable(), // user-set time of day (minutes); null = the planner places it
 	position: z.number().int(), // order within its container (the pool, or one day)
 	completed_at: isoDateTime.nullable(),
 	updated_at: isoDateTime,
@@ -84,6 +90,12 @@ export const moveActionItemInput = z.object({
 	index: z.number().int().min(0) // position among the target container's open items
 });
 
+/** Pin to a day and time (dragging a block on the calendar). */
+export const pinActionItemInput = z.object({
+	scheduled_date: isoDate,
+	start: actionItemRecord.shape.pinned_start.unwrap()
+});
+
 // --- Types -------------------------------------------------------------------
 export type Priority = z.infer<typeof priority>;
 export type ActionItemStatus = z.infer<typeof actionItemStatus>;
@@ -92,3 +104,4 @@ export type ActionItemRecord = z.infer<typeof actionItemRecord>;
 export type CreateActionItemInput = z.infer<typeof createActionItemInput>;
 export type UpdateActionItemInput = z.infer<typeof updateActionItemInput>;
 export type MoveActionItemInput = z.infer<typeof moveActionItemInput>;
+export type PinActionItemInput = z.infer<typeof pinActionItemInput>;

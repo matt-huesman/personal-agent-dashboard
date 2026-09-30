@@ -1,0 +1,2 @@
+ALTER TABLE "action_items" ADD COLUMN "pinned_start" integer;--> statement-breakpoint
+ALTER TABLE "action_items" ADD CONSTRAINT "action_items_pin_has_day" CHECK ("action_items"."pinned_start" is null or "action_items"."scheduled_date" is not null);

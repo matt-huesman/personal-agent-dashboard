@@ -6,6 +6,9 @@ The first feature is an **action-item board**: an upstream scheduled Claude task
 writes a JSON envelope of action items from email; the dashboard ingests it into
 a pool, and you schedule items onto days, reorder them, and check them off.
 
+**Developing here (people or agents)?** Start with [AGENTS.md](AGENTS.md), then
+[CONVENTIONS.md](CONVENTIONS.md).
+
 **Stack:** SvelteKit (Svelte 5) · TypeScript · Tailwind v4 + shadcn-svelte ·
 Postgres 17 · Drizzle · Zod · Docker Compose · pnpm
 
@@ -87,7 +90,9 @@ The dev server and the Docker app share the same database.
   sessions (default 90 min) with breaks, puts urgent and deep work first,
   never plans in the past, and flags what won't fit instead of cramming it in.
   Tune it under **Planning**. Calendar integrations plug in as busy time
-  (`features/calendar/source.ts`).
+  (`features/calendar/source.ts`). **Drag a task block** to pin it to a day
+  and time: the planner works around it, and a weekly task keeps that time
+  every week. Unpin it from the block's details.
 - **Digests:** each email-agent run as a morning/afternoon/evening briefing:
   FYIs, suggested replies (copyable), new tasks and possible spam, each linked
   to its email.

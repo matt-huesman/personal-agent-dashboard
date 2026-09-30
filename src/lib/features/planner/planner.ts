@@ -19,6 +19,8 @@
 //      current task, and only then a task from another context.
 //   5. Don't overcommit. Total focused work is capped per day; the rest is
 //      returned as overflow instead of being crammed in.
+//   6. The user's placements win. A pinned task sits exactly at its time,
+//      whole, and counts toward the cap; everything else plans around it.
 //
 // All times are minutes since local midnight, in steps of 5.
 
@@ -33,6 +35,7 @@ export type PlanTask = {
 	priority: Priority;
 	due: boolean; // due on or before the planned day
 	order: number; // the user's own order, the final tie-break
+	pinned: number | null; // a start time the user chose; placed exactly there, never moved or split
 };
 
 /** Time that's already taken (calendar events). */
@@ -53,6 +56,7 @@ export type PlanBlock =
 			task_id: string;
 			context: string;
 			estimated: boolean; // true when the default estimate was assumed
+			pinned: boolean; // placed by the user, not the planner
 			part: number; // 1-based; parts > 1 when the task was split
 			parts: number;
 	  }
@@ -78,18 +82,41 @@ export function planDay({ tasks, busy, now, settings: s }: PlanInput): DayPlan {
 	const reserved = s.lunch_minutes
 		? [{ start: s.lunch_start, end: s.lunch_start + s.lunch_minutes, label: 'Lunch' }]
 		: [];
+	// Pinned tasks are the user's decisions: placed exactly where they were put
+	// (even in the past or over an event), then planned around like fixed time.
+	const pinned = tasks
+		.filter((t) => t.pinned !== null)
+		.map((t) => {
+			const minutes = t.minutes ?? s.default_estimate_minutes;
+			return {
+				kind: 'task' as const,
+				start: t.pinned!,
+				end: Math.min(24 * 60, t.pinned! + minutes),
+				task_id: t.id,
+				context: t.context,
+				estimated: t.minutes === null,
+				pinned: true,
+				part: 1,
+				parts: 1
+			};
+		});
+
 	const blocks: PlanBlock[] = [
 		...busy.map((b) => ({ kind: 'busy' as const, ...b })),
-		...reserved.map((r) => ({ kind: 'reserved' as const, ...r }))
+		...reserved.map((r) => ({ kind: 'reserved' as const, ...r })),
+		...pinned
 	];
 
-	const queue = orderUnits(tasks, s);
-	let capacity = s.daily_capacity_minutes;
+	const queue = orderUnits(
+		tasks.filter((t) => t.pinned === null),
+		s
+	);
+	let capacity = s.daily_capacity_minutes - pinned.reduce((sum, b) => sum + b.end - b.start, 0);
 	let session = 0; // focused minutes since the last break
 	let last: string | null = null; // context of the previous task in this session
 	let prevEnd: number | null = null;
 
-	for (const w of freeWindows([...busy, ...reserved], now, s)) {
+	for (const w of freeWindows([...busy, ...reserved, ...pinned], now, s)) {
 		// A long enough gap (lunch, a meeting) is itself a break.
 		if (prevEnd !== null && w.start - prevEnd >= Math.max(s.break_minutes, MIN_CHUNK)) {
 			session = 0;
@@ -114,6 +141,7 @@ export function planDay({ tasks, busy, now, settings: s }: PlanInput): DayPlan {
 					task_id: unit.task.id,
 					context: unit.task.context,
 					estimated: unit.estimated,
+					pinned: false,
 					part: 0,
 					parts: 0
 				});

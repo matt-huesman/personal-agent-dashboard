@@ -114,7 +114,8 @@ export function planFor(
 			context: contextOf(i),
 			priority: i.priority,
 			due: i.due_date !== null && i.due_date <= day,
-			order: i.position
+			order: i.position,
+			pinned: i.pinned_start
 		}));
 	return planDay({
 		tasks,

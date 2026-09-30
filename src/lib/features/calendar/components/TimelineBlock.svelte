@@ -1,9 +1,11 @@
 <script lang="ts">
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import CheckIcon from '@lucide/svelte/icons/check';
+	import PinIcon from '@lucide/svelte/icons/pin';
+	import PinOffIcon from '@lucide/svelte/icons/pin-off';
 	import * as Popover from '$lib/components/ui/popover';
 	import { Button } from '$lib/components/ui/button';
-	import { formatClock } from '$lib/dates';
+	import { formatClock, weekdayName } from '$lib/dates';
 	import { formatMinutes } from '$lib/durations';
 	import type { ActionItemRecord } from '$lib/features/action-items/schema';
 	import type { PlanBlock } from '$lib/features/planner/planner';
@@ -15,14 +17,20 @@
 		height,
 		item,
 		style,
-		oncomplete
+		dragging = false,
+		ongrab,
+		oncomplete,
+		onunpin
 	}: {
 		block: PlanBlock;
 		top: number;
 		height: number;
 		item?: ActionItemRecord; // task blocks
 		style?: ContextStyle; // task blocks
+		dragging?: boolean; // this block is being dragged (shown faded)
+		ongrab?: (e: PointerEvent) => void; // pointer down on a task block: maybe a drag
 		oncomplete: (item: ActionItemRecord) => void;
+		onunpin: (item: ActionItemRecord) => void;
 	} = $props();
 
 	const range = $derived(`${formatClock(block.start)}–${formatClock(block.end, true)}`);
@@ -33,14 +41,24 @@
 	<Popover.Root>
 		<Popover.Trigger
 			class={[
-				'absolute inset-x-1 overflow-hidden rounded-md border-l-[3px] px-1.5 text-left text-xs transition-shadow hover:shadow-sm focus-visible:ring-2 focus-visible:ring-ring',
+				'absolute inset-x-1 cursor-grab touch-none overflow-hidden rounded-md border-l-[3px] px-1.5 text-left text-xs transition-[shadow,opacity] select-none hover:shadow-sm focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing',
 				block.estimated &&
 					'border-y border-r border-dashed border-y-foreground/20 border-r-foreground/20',
-				roomy ? 'py-1' : 'flex items-center gap-1.5'
+				block.pinned && 'ring-1 ring-foreground/25',
+				roomy ? 'py-1' : 'flex items-center gap-1.5',
+				dragging && 'opacity-30'
 			]}
 			style="top: {top}px; height: {height}px; border-left-color: {style.color}; background: color-mix(in oklab, {style.color} 14%, var(--background));"
+			onpointerdown={ongrab}
+			title={block.pinned ? 'Pinned by you · drag to move' : 'Placed by the planner · drag to pin'}
 		>
-			<span class={['font-medium text-foreground', roomy ? 'line-clamp-2' : 'truncate']}>
+			<span
+				class={[
+					'flex items-start gap-1 font-medium text-foreground',
+					roomy ? 'line-clamp-2' : 'truncate'
+				]}
+			>
+				{#if block.pinned}<PinIcon class="mt-0.5 size-3 shrink-0" />{/if}
 				{item.title}
 			</span>
 			<span class="block truncate text-[0.7rem] text-muted-foreground tabular-nums">
@@ -58,7 +76,18 @@
 				</div>
 				<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
 					<dt class="text-muted-foreground">When</dt>
-					<dd class="tabular-nums">{range}</dd>
+					<dd class="tabular-nums">
+						{range}
+						<span class="block text-muted-foreground">
+							{#if block.pinned}
+								Pinned by you{item.sticky && item.scheduled_date
+									? `, every ${weekdayName(item.scheduled_date)}`
+									: ''}
+							{:else}
+								Placed by the planner · drag to pin
+							{/if}
+						</span>
+					</dd>
 					{#if block.parts > 1}
 						<dt class="text-muted-foreground">Part</dt>
 						<dd>{block.part} of {block.parts}</dd>
@@ -72,8 +101,13 @@
 						{/if}
 					</dd>
 				</dl>
-				<div class="flex gap-2">
+				<div class="flex flex-wrap gap-2">
 					<Button size="sm" onclick={() => oncomplete(item)}><CheckIcon />Mark done</Button>
+					{#if block.pinned}
+						<Button size="sm" variant="outline" onclick={() => onunpin(item)}>
+							<PinOffIcon />Unpin
+						</Button>
+					{/if}
 					<Button size="sm" variant="ghost" href="/">Board<ArrowRightIcon /></Button>
 				</div>
 			</div>

@@ -7,7 +7,7 @@
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button';
-	import { addDays, formatAgo, mondayOf } from '$lib/dates';
+	import { addDays, formatAgo, formatClock, weekdayName } from '$lib/dates';
 	import { manifestOf } from '$lib/integrations/registry';
 	import { formatMinutes } from '$lib/durations';
 	import { actionItemsApi } from '$lib/features/action-items/api';
@@ -33,7 +33,7 @@
 		)
 	);
 
-	const days = $derived(Array.from({ length: 7 }, (_, i) => addDays(data.week, i)));
+	const days = $derived(Array.from({ length: 7 }, (_, i) => addDays(data.from, i)));
 	const items = $derived(new Map(data.items.map((i) => [i.id, i])));
 	const plans = $derived(
 		new Map(
@@ -81,10 +81,9 @@
 				timeZone: 'UTC',
 				...opts
 			});
-		return `${fmt(data.week, {})} – ${fmt(addDays(data.week, 6), { year: 'numeric' })}`;
+		return `${fmt(data.from, {})} – ${fmt(addDays(data.from, 6), { year: 'numeric' })}`;
 	});
 
-	const thisWeek = $derived(mondayOf(data.today));
 	let editingSettings = $state(false);
 
 	async function run(action: Promise<unknown>) {
@@ -97,6 +96,15 @@
 	}
 
 	const complete = (item: ActionItemRecord) => run(actionItemsApi.complete(item.id));
+
+	/** Dropped on the calendar: the task is fixed at that day and time. */
+	async function pin(item: ActionItemRecord, day: string, start: number) {
+		await run(actionItemsApi.pin(item.id, { scheduled_date: day, start }));
+		const when = `${weekdayName(day)} ${formatClock(start, true)}`;
+		toast(`Pinned to ${when}`, {
+			description: item.sticky ? `Every ${weekdayName(day)} from now on` : item.title
+		});
+	}
 
 	async function saveSettings(settings: PlannerSettings) {
 		editingSettings = false;
@@ -114,8 +122,8 @@
 
 <svelte:head><title>Calendar</title></svelte:head>
 
-<main class="px-6 py-6 sm:px-8">
-	<header class="mb-5 flex flex-wrap items-end justify-between gap-3">
+<main class="flex h-dvh flex-col px-6 py-6 sm:px-8">
+	<header class="mb-5 flex shrink-0 flex-wrap items-end justify-between gap-3">
 		<div>
 			<p class="text-sm text-muted-foreground">
 				{#if week.planned}
@@ -133,18 +141,18 @@
 			<Button
 				variant="ghost"
 				size="icon-sm"
-				href="?week={addDays(data.week, -7)}"
+				href="?from={addDays(data.from, -7)}"
 				aria-label="Previous week"
 			>
 				<ChevronLeftIcon />
 			</Button>
-			<Button variant="outline" size="sm" href="?week={thisWeek}" disabled={data.week === thisWeek}>
+			<Button variant="outline" size="sm" href="?" disabled={data.from === data.today}>
 				Today
 			</Button>
 			<Button
 				variant="ghost"
 				size="icon-sm"
-				href="?week={addDays(data.week, 7)}"
+				href="?from={addDays(data.from, 7)}"
 				aria-label="Next week"
 			>
 				<ChevronRightIcon />
@@ -165,9 +173,12 @@
 		settings={data.settings}
 		{styleOf}
 		oncomplete={complete}
+		onpin={pin}
+		onunpin={(item) => run(actionItemsApi.unpin(item.id))}
+		class="min-h-0 flex-1"
 	/>
 
-	<footer class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+	<footer class="mt-3 flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
 		{#each legend as entry (entry.label)}
 			<span class="flex items-center gap-1.5">
 				<span class="size-2 rounded-full" style:background={entry.color}></span>{entry.label}
@@ -200,7 +211,7 @@
 							: 'syncing…'}
 				</span>
 			{:else}
-				<a href="?week={data.week}&panel=integrations" class="underline-offset-2 hover:underline">
+				<a href="?from={data.from}&panel=integrations" class="underline-offset-2 hover:underline">
 					Connect a calendar to plan around your events
 				</a>
 			{/each}

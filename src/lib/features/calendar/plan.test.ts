@@ -18,6 +18,7 @@ function item(overrides: Partial<ActionItemRecord>): ActionItemRecord {
 		completed_at: null,
 		updated_at: '',
 		deleted_at: null,
+		pinned_start: null,
 		...overrides
 	} as ActionItemRecord;
 }

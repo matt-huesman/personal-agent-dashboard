@@ -6,6 +6,7 @@ import type {
 	ActionItemRecord,
 	createActionItemInput,
 	MoveActionItemInput,
+	PinActionItemInput,
 	UpdateActionItemInput
 } from './schema';
 
@@ -26,6 +27,8 @@ export const actionItemsApi = {
 	update: (id: string, input: UpdateActionItemInput): Item => send(`/${id}`, 'PATCH', input),
 	remove: (id: string) => send(`/${id}`, 'DELETE'),
 	move: (id: string, input: MoveActionItemInput): Item => send(`/${id}/move`, 'POST', input),
+	pin: (id: string, input: PinActionItemInput): Item => send(`/${id}/pin`, 'POST', input),
+	unpin: (id: string): Item => send(`/${id}/unpin`, 'POST'),
 	complete: (id: string): Item => send(`/${id}/complete`, 'POST'),
 	reopen: (id: string): Item => send(`/${id}/reopen`, 'POST'),
 	restore: (id: string): Item => send(`/${id}/restore`, 'POST')

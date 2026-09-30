@@ -163,6 +163,62 @@ describe('action-item service', () => {
 			expect(moved).toMatchObject({ status: 'pool', sticky: false });
 		});
 	});
+
+	describe('pinned times (dragging on the calendar)', () => {
+		const H = 60;
+
+		it('pins a pool item onto a day and time, and unpins it', async () => {
+			const item = await service.create(input('Write report'));
+			const pinned = await service.pin(item.id, { scheduled_date: TOMORROW, start: 10 * H });
+			expect(pinned).toMatchObject({
+				status: 'scheduled',
+				scheduled_date: TOMORROW,
+				pinned_start: 600
+			});
+
+			expect(await service.unpin(item.id)).toMatchObject({
+				scheduled_date: TOMORROW,
+				pinned_start: null
+			});
+		});
+
+		it('keeps a weekly item at its pinned time every week', async () => {
+			const gym = await service.create(
+				createActionItemInput.parse({ title: 'Gym', scheduled_date: '2026-09-22', sticky: true })
+			);
+			await service.pin(gym.id, { scheduled_date: '2026-09-22', start: 17 * H + 30 });
+			await service.complete(gym.id);
+
+			const [next] = await service.listBoard(TODAY); // Thursday: last Tuesday has passed
+			expect(next).toMatchObject({
+				scheduled_date: '2026-09-29',
+				pinned_start: 17 * H + 30,
+				status: 'scheduled'
+			});
+		});
+
+		it('drops the pin when the time has passed or the item leaves its day for the pool', async () => {
+			const late = await service.create(input('Late', '2026-09-22'));
+			await service.pin(late.id, { scheduled_date: '2026-09-22', start: 9 * H });
+			const rolled = (await service.listBoard(TODAY)).find((i) => i.id === late.id)!;
+			expect(rolled).toMatchObject({ scheduled_date: TODAY, pinned_start: null });
+
+			const kept = await service.create(input('Kept', TOMORROW));
+			await service.pin(kept.id, { scheduled_date: TOMORROW, start: 14 * H });
+			const otherDay = await service.move(kept.id, { scheduled_date: '2026-09-28', index: 0 });
+			expect(otherDay.pinned_start).toBe(14 * H); // the time of day comes along
+			const pooled = await service.move(kept.id, { scheduled_date: null, index: 0 });
+			expect(pooled.pinned_start).toBeNull();
+		});
+
+		it('refuses to pin a done item', async () => {
+			const item = await service.create(input('Done already', TOMORROW));
+			await service.complete(item.id);
+			await expect(
+				service.pin(item.id, { scheduled_date: TOMORROW, start: 9 * H })
+			).rejects.toMatchObject({ status: 409 });
+		});
+	});
 });
 
 function input(title: string, scheduled_date: string | null = null) {
